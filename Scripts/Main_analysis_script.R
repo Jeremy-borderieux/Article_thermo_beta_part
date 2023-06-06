@@ -63,6 +63,7 @@ source(file.path("Scripts","Functions.R"))
 ## lexical detail
 ## idp : NFI plot identifier
 ## Ser : Sylvoecoregions; forest ecoregions simplified to ecoregions in the main text
+## Tmoy : MAT, mean annua temperature 
 
 source(file.path("Scripts","Read_2005_2021_NFI.R"))
 
@@ -461,6 +462,11 @@ NFI_pairs_info[,mean(survey_during_vege_season),by=period]
 
 # mean canopy cover of the two period
 NFI_pairs_info[,mean(canopy_cover,na.rm=T),by=period]
+
+# climate range of the ecoregions
+ser_variable_summary[,greco:=str_extract(ser,"[:alpha:]")] # large ecoregions GRECO
+ser_variable_summary[,ecoregion:= ifelse(greco%in% c("J"),"Medit",ifelse(greco%in% c("D","G","E","H","I"),"Mountain","Lowland")),]
+ser_variable_summary[,.(MAT=range(mean_tmoy),Prec=range(mean_pp)),by=ecoregion]
 
 #### Statistical tests #### 
 
