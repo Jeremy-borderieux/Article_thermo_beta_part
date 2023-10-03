@@ -1,4 +1,4 @@
-  
+
 #### fig 2 ####
 
 
@@ -255,4 +255,91 @@ stopCluster(clust_contrib)
 
 
 bootstrap_uncertain_topt
+
+####  histogram for different ecoreg ####
+
+
+
+summary(lm(log(occ)~topt_climplant,data=summed_sp_occ))
+summary(lm(n_delta_occ~log(past_occ)+topt_climplant,data=summed_sp_occ[past_occ>1,]))
+
+summary(lm(n_delta_occ~past_occ+topt_climplant,data=summed_sp_occ[past_occ<500 & past_occ>10,]))
+
+
+list_sp_contrib[,large_nplot:=ser%in%contrib_therm_beta_ser[n_plot>208,ser] ]
+
+ggplot(list_sp_contrib[],aes(x=occurrence_recent,y=ifelse(sp_relative_occ=="col",-delta_beta,delta_beta)))+geom_point(size=0.5)+geom_smooth()+scale_x_continuous(trans="log",breaks = c(0,1,10,100,1000,10000))+geom_hline(yintercept = 0,col="grey50")+theme_bw()+
+  facet_wrap(~large_nplot)
+
+
+list_sp_contrib_small_melt<-melt.data.table(list_sp_contrib,measure.vars = c("occurrence_past" , "occurrence_recent"))
+
+
+ggplot(list_sp_contrib[greco=="J"],aes(x=topt_climplant))+
+  geom_histogram(position="origin",mapping=aes(weight=occurrence_past,color="Past"))+
+  geom_histogram(position="origin",mapping=aes(weight=occurrence_recent*0.5,color="Recent"))+
+  theme_bw()
+
+ggplot(list_sp_contrib_small_melt[greco=="J"],aes(x=topt_climplant,y=..scaled..,weight=value,fill=variable))+
+  geom_density(alpha=0.5,position = "identity",color="grey50",adjust=1.25)+
+  theme_bw()
+
+ggplot(list_sp_contrib_small_melt,aes(x=topt_climplant,y=..scaled..,weight=value,fill=variable))+
+  geom_density(alpha=0.5,position = "identity",color="grey50",adjust=1.25)+
+  theme_bw()+
+  facet_wrap(~greco)
+
+
+ggplot(list_sp_contrib_small_melt[greco=="J"],aes(x=topt_climplant,y=..scaled..,weight=value,fill=variable))+
+  geom_density(alpha=0.5,position = "identity",color="grey50",adjust=0.75)+
+  theme_bw()+
+  facet_wrap(~ser)
+
+
+contrib_therm_beta_ser[,sum(n_plot),by=ser]
+
+ggplot(list_sp_contrib_small_melt[ser=="J23"],aes(x=topt_climplant,y=..scaled..,weight=value,fill=variable))+
+  geom_density(alpha=0.5,position = "identity",color="grey50",adjust=0.75)+
+  theme_bw()
+
+
+sd_table<-list_sp_contrib[,.(sd_past=sd(rep(topt_climplant,occurrence_past)),
+                             sd_recent=sd(rep(topt_climplant,occurrence_recent))),by=ser][order(ser),]
+sd_table[,diff:= sd_recent- sd_past]
+
+library(sn)
+greco_of_interest<-"J"
+
+summary(selm(topt_climplant ~ 1, data=list_sp_contrib[greco==greco_of_interest],weights = list_sp_contrib[greco==greco_of_interest]$occurrence_past))
+
+summary(selm(topt_climplant ~ 1, data=list_sp_contrib[greco==greco_of_interest],weights = list_sp_contrib[greco==greco_of_interest]$occurrence_recent))
+
+
+
+list_sp_contrib[,common_rare:=ifelse(sp_relative_beta == "Homogenize" & sp_relative_occ=="ext"  , "rare","common")]
+list_sp_contrib[,common_rare:=ifelse(sp_relative_beta == "Heterogenize" & sp_relative_occ=="col"  , "rare",common_rare)]
+
+
+list_sp_contrib[common_rare=="rare",print(hist(occurrence_past,main=unique(greco))),by=.(common_rare,greco)][common_rare=="rare"]
+list_sp_contrib[common_rare=="rare",print(hist(occurrence_total,main=unique(greco))),by=.(common_rare,greco)][common_rare=="rare"]
+
+list_sp_contrib[common_rare=="common" & occurrence_total<10 ,print(hist(occurrence_past,main=unique(greco))),by=.(common_rare,greco)][common_rare=="rare"]
+list_sp_contrib[common_rare=="common" & occurrence_total<20,print(hist(occurrence_total,main=unique(greco),breaks=0:20)),by=.(common_rare,greco)][common_rare=="rare"]
+
+list_sp_contrib[common_rare=="rare",.(mean(occurrence_past),mean(occurrence_recent),mean(occurrence_total)),by=greco][order(greco),]
+list_sp_contrib[common_rare=="rare",.(min(occurrence_past),min(occurrence_recent),min(occurrence_total)),by=greco][order(greco),]
+list_sp_contrib[common_rare=="rare",.(max(occurrence_past),max(occurrence_recent),max(occurrence_total)),by=greco][order(greco),]
+
+
+list_sp_contrib[,.(sum(raw_contrib)),by=(ser)][,mean(V1)]
+list_sp_contrib[sp_relative_occ!="stable",.(sum(raw_contrib)),by=.(sp_relative_topt,sp_relative_occ,occurrence_past<5,ser)][1:16,]
+list_sp_contrib[sp_relative_occ!="stable",.(sum(raw_contrib),sum(delta_beta)),by=.(sp_relative_topt,sp_relative_occ,occurrence_past<5,ser)][1:16,]
+
+list_sp_contrib[sp_relative_occ!="stable" &greco=="J" ,.(sum(raw_contrib),sum(delta_beta)),by=.(sp_relative_topt,sp_relative_occ,occurrence_past<5,ser)][1:16,]
+
+
+list_sp_contrib[occurrence_total==3 & sp_relative_occ!="stable",table(common_rare)]
+
+
+list_sp_contrib[occurrence_past==5 & sp_relative_occ!="stable",table(common_rare)]
 
