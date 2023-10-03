@@ -187,7 +187,7 @@ create_comparaison_table<-function(table_1,table_2,ser=NULL){
   
   names_of_col<-c("species_name","occurrence_past","occurrence_recent","occurrence_total","past_recent",
                   "genre_only","genre","topt_climplant","topt_picq" ,"topt","niche_breadth",
-                  "niche_breadth_n","N_ellenberg","vi_pH","K_Ellenberg","indFor_Chytry","Area")
+                  "L_Ellenberg","N_ellenberg","vi_pH","K_Ellenberg","indFor_Chytry","Area")
   
   # if(is.null(ser))warning("no SER imput, not checking EurForPlant list") else{
   #   greco<-substr(ser,1,1)
@@ -442,21 +442,30 @@ get_contrib_one_ser<-function(ser_select, # character, if of an ecoregion
   if(n_comp==8){
     
     comparison_surv_one_ser_beta[,sp_relative_beta:=ifelse(delta_beta==0,"stable",ifelse(delta_beta<0,"Homogenize","Heterogenize"))]
+    comparison_surv_one_ser_beta[,common_rare:=ifelse(sp_relative_beta == "Homogenize" & sp_relative_occ=="ext"  , "rare","common")]
+    comparison_surv_one_ser_beta[,common_rare:=ifelse(sp_relative_beta == "Heterogenize" & sp_relative_occ=="col"  , "rare",common_rare)]
+    
+    comparison_surv_one_ser_beta[,sp_relative_beta:=ifelse((occurrence_past+occurrence_recent)<= (5) , "rare","common")]
+    comparison_surv_one_ser_beta[,sp_relative_beta:=ifelse((occurrence_past)<= ((N_plot/2)*0.1) , "rare","common")]
+    
     
     bet_test<-comparison_surv_one_ser_beta[,.(N_past=sum(occurrence_past),N=sum(occurrence_recent),raw_contrib=sum(raw_contrib,na.rm=T),beta=sum(delta_beta)),by=.(sp_relative_occ,sp_relative_topt,sp_relative_beta)][order(sp_relative_topt,sp_relative_occ,sp_relative_beta)]#[sp_relative_beta!="stable"]
     bet_test<-bet_test[sp_relative_occ!="stable",]
     bet_test<-bet_test[order(sp_relative_topt, sp_relative_occ),]
     
-    
-    decompose_beta_8<-bet_test[,.(N_past=sum(N_past),N=sum(N),contrib_topt=sum(raw_contrib),contrib_beta=sum(beta)),by=.(sp_relative_topt,sp_relative_occ,sp_relative_beta )][sp_relative_beta!="stable",]
+    decompose_beta_8<-bet_test[,.(N_past=sum(N_past),N=sum(N),contrib_topt=sum(raw_contrib),contrib_beta=sum(beta)),by=.(sp_relative_topt,sp_relative_occ,sp_relative_beta )][sp_relative_occ!="stable",]
+
+    #results_8<-dcast.data.table(decompose_beta_8, .~sp_relative_topt+sp_relative_occ+sp_relative_beta,value.var = c("contrib_topt", "contrib_beta"))
     results_8<-dcast.data.table(decompose_beta_8, .~sp_relative_topt+sp_relative_occ+sp_relative_beta,value.var = c("contrib_topt", "contrib_beta"))
-    results_8$.<-NULL
     
-    try(results_8[,topt_contrib_colder_Homogenize :=contrib_topt_colder_ext_Homogenize +contrib_topt_colder_col_Homogenize ])
-    try(results_8[,topt_contrib_colder_Heterogenize :=contrib_topt_colder_ext_Heterogenize +contrib_topt_colder_col_Heterogenize])
-    try(results_8[,topt_contrib_warmer_Homogenize :=contrib_topt_warmer_ext_Homogenize +contrib_topt_warmer_col_Homogenize ])
-    try(results_8[,topt_contrib_warmer_Heterogenize :=contrib_topt_warmer_ext_Heterogenize +contrib_topt_warmer_col_Heterogenize])
     
+     results_8$.<-NULL
+    
+    # try(results_8[,topt_contrib_colder_Homogenize :=contrib_topt_colder_ext_Homogenize +contrib_topt_colder_col_Homogenize ])
+    # try(results_8[,topt_contrib_colder_Heterogenize :=contrib_topt_colder_ext_Heterogenize +contrib_topt_colder_col_Heterogenize])
+    # try(results_8[,topt_contrib_warmer_Homogenize :=contrib_topt_warmer_ext_Homogenize +contrib_topt_warmer_col_Homogenize ])
+    # try(results_8[,topt_contrib_warmer_Heterogenize :=contrib_topt_warmer_ext_Heterogenize +contrib_topt_warmer_col_Heterogenize])
+    # 
   }
 
   results<-cbind(results,ecopart_four_ser)

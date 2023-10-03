@@ -189,7 +189,7 @@ pairs_ser<-foreach(ser_current=unique(NFI_plot_info$ser),.combine = rbind,.multi
   pairs<-get_pair_optimal(NFI_plot_info_sf[,],pair_distances[idp1 %in%idp_in_ser & idp2 %in% idp_in_ser ,],distance_tresh=1.91,
                           differences_to_compute=col_of_interest,
                           differences_tresh_min = c(9,-100,rep(0,13)),
-                          differences_tresh_max = c(10,100,rep(0,13)))
+                          differences_tresh_max = c(11,100,rep(0,13)))
   pairs[,ser:=ser_current]
   pairs
 }
@@ -297,8 +297,9 @@ list_contrib<-foreach(sertest=unique(pairs_ser$ser),
 
 contrib_therm_beta_ser<-list_contrib[[1]]
 
+
 ## we add the result the descriptive variable of the ecoregions
-contrib_therm_beta_ser<-merge(contrib_therm_beta_ser,ser_variable_summary,by="ser")
+contrib_therm_beta_ser<-merge(contrib_therm_beta_ser,ser_variable_summary[,-"greco"],by="ser")
 
 ## list of the intermediary computation at the species and ecoregion scale
 list_sp_contrib<-list_contrib[[2]]
@@ -332,21 +333,31 @@ contrib_therm_beta_ser_ecoplant_picq<-list_contrib_ecoplant_picq[[1]]
 
 
 list_contrib_8_comp<-foreach(sertest=unique(pairs_ser$ser),
-                      .combine = rbind_list_list,.multicombine = T,.errorhandling = "remove",.packages = c("data.table","stringr"))%do%{
-                        res<-get_contrib_one_ser(sertest,table_flora,8,"topt_climplant")
-                        cat(paste0(sertest," -> "))
-                        return(res)}
+                             .combine = list,.multicombine = T,.errorhandling = "remove",.packages = c("data.table","stringr"))%do%{
+                               res<-get_contrib_one_ser(sertest,table_flora,8,"topt_climplant")[[1]]
+                               cat(paste0(sertest," -> "))
+                               return(res)}
 
+contrib_therm_beta_ser_8<-rbindlist(list_contrib_8_comp,fill=T)
 
-contrib_therm_beta_ser_8<-list_contrib_8_comp[[1]]
-
+# ecoregions don't display any rare species because of their low number of plots, we set the contributino to 0
+contrib_therm_beta_ser_8[,contrib_topt_colder_col_rare:=ifelse(is.na(contrib_topt_colder_col_rare),0,contrib_topt_colder_col_rare)]
+contrib_therm_beta_ser_8[,contrib_beta_colder_col_rare :=ifelse(is.na(contrib_beta_colder_col_rare ),0,contrib_beta_colder_col_rare )]
+contrib_therm_beta_ser_8[,contrib_topt_warmer_col_rare :=ifelse(is.na(contrib_topt_warmer_col_rare ),0,contrib_topt_warmer_col_rare )]
+contrib_therm_beta_ser_8[,contrib_beta_warmer_col_rare:=ifelse(is.na(contrib_beta_warmer_col_rare),0,contrib_beta_warmer_col_rare)]
+contrib_therm_beta_ser_8[,contrib_beta_warmer_ext_rare:=ifelse(is.na(contrib_beta_warmer_ext_rare),0,contrib_beta_warmer_ext_rare)]
+contrib_therm_beta_ser_8[,contrib_topt_warmer_ext_rare:=ifelse(is.na(contrib_topt_warmer_ext_rare),0,contrib_topt_warmer_ext_rare)]
+contrib_therm_beta_ser_8[,contrib_beta_colder_col_rare:=ifelse(is.na(contrib_beta_colder_col_rare),0,contrib_beta_colder_col_rare)]
+contrib_therm_beta_ser_8[,contrib_topt_colder_col_rare:=ifelse(is.na(contrib_topt_colder_col_rare),0,contrib_topt_colder_col_rare)]
+contrib_therm_beta_ser_8[,contrib_topt_colder_ext_rare:=ifelse(is.na(contrib_topt_colder_ext_rare),0,contrib_topt_colder_ext_rare)]
+contrib_therm_beta_ser_8[,contrib_beta_colder_ext_rare:=ifelse(is.na(contrib_beta_colder_ext_rare),0,contrib_beta_colder_ext_rare)]
 
 
 ## the following foreach loop are long computation (> 1 hours with 4 cores)
 # their results are saved as .RData to rapidly go through the next parts of the script
 bootstrap_random_topt<-readRDS(file.path("Saved_computation","bootstrap_random_topt.RData"))
 bootstrap_same_n_occurrence<-readRDS(file.path("Saved_computation","bootstrap_same_n_occurrence.RData"))
-bootstrap_uncertain_topt<-readRDS(file.path("Saved_computation","bootstrap_uncertain_topt.RData"))
+bootstrap_random_topt_full<-readRDS(file.path("Saved_computation","bootstrap_random_topt_full.RData"))
 
 
 ## Parallel setup , you can shut down the cluster at anytime with stopCluster(clust_contrib)
@@ -357,7 +368,7 @@ registerDoParallel(clust_contrib)
 ## supplementary analysis : bootstrap with random thermal optima assigned to each species
 bootstrap_random_topt<-foreach(sertest=unique(pairs_ser$ser),
                                .combine = rbind,.multicombine = T,.errorhandling = "remove",.packages = c("data.table","stringr","foreach"))%dopar%{
-                                 res<-run_contrib_multiple_time(200,sertest,table_flora,8,"topt_climplant",random_topt=T)
+                                 res<-run_contrib_multiple_time(200,sertest,table_flora,8,"topt_climplant",random_topt=T,average = F)
                                  cat(paste0(sertest," -> "))
                                  return(res)}
 
@@ -376,19 +387,6 @@ bootstrap_same_n_occurrence<-foreach(sertest=unique(pairs_ser$ser),
 stopCluster(clust_contrib)
 
 
-## incorporating the uncertainties in thermal optimum estimation Rodríguez-Sánchez et al, 2012
-clust_contrib<-makeCluster(n_cores_to_use)
-registerDoParallel(clust_contrib)
-bootstrap_uncertain_topt<-foreach(sertest=unique(pairs_ser$ser),
-                                     .combine = rbind,.multicombine = T,.errorhandling = "remove",.packages = c("data.table","stringr","foreach"))%dopar%{
-                                       res<- run_contrib_multiple_time(500,sertest,table_flora,n_comp = 4,rarefy = F,random_topt = "error",average = T)
-                                       cat(paste0(sertest," -> "))
-                                       return(res)}
-
-stopCluster(clust_contrib)
-
-
-bootstrap_uncertain_topt
 
 #### Descriptive statistics  ####
 
@@ -417,8 +415,11 @@ NFI_pairs_info[,sum(n_sp_climplant)/.N,by=.(period,survey_during_vege_season )]
 
 # mean time difference between the two survey
 pairs_ser[,mean(campaign_dif)]
+
 # mean distance between the two survey
-pairs_ser[,mean(dist_pair)]
+summary(pairs_ser$dist_pair)
+summary(pairs_ser$xl_dif)
+summary(pairs_ser$yl_dif)
 
 # W. mean of the thermal optimum of the species
 list_sp_contrib[,weighted.mean(topt_climplant,occurrence_past),]
@@ -435,6 +436,13 @@ sum(contrib_therm_beta_ser[, sp_thermo>0])
 
 contrib_therm_beta_ser[,weighted.mean(sp_thermo,n_pair)]
 contrib_therm_beta_ser[,weighted.mean(topt_ext,n_pair)]
+
+contrib_therm_beta_ser[,weighted.mean(sp_delta_beta,n_pair)]
+contrib_therm_beta_ser[,weighted.mean(beta_ext,n_pair)]
+contrib_therm_beta_ser[,weighted.mean(beta_col,n_pair)]
+contrib_therm_beta_ser[,weighted.mean(beta_ext,n_pair)]
+
+
 
 mean(contrib_therm_beta_ser[, topt_ext])
 sd(contrib_therm_beta_ser[, topt_ext])
@@ -457,6 +465,12 @@ mean(contrib_therm_beta_ser[, contrib_beta_colder_col])
 sd(contrib_therm_beta_ser[, contrib_beta_colder_col])
 
 
+mean(contrib_therm_beta_ser[, Beta1])
+sd(contrib_therm_beta_ser[, Beta1])
+
+mean(contrib_therm_beta_ser[, Beta2])
+sd(contrib_therm_beta_ser[, Beta2])
+
 # proportion of surveys during the vege season for the two period
 NFI_pairs_info[,mean(survey_during_vege_season),by=period]
 
@@ -467,6 +481,26 @@ NFI_pairs_info[,mean(canopy_cover,na.rm=T),by=period]
 ser_variable_summary[,greco:=str_extract(ser,"[:alpha:]")] # large ecoregions GRECO
 ser_variable_summary[,ecoregion:= ifelse(greco%in% c("J"),"Medit",ifelse(greco%in% c("D","G","E","H","I"),"Mountain","Lowland")),]
 ser_variable_summary[,.(MAT=range(mean_tmoy),Prec=range(mean_pp)),by=ecoregion]
+
+##national scale homogenization 
+
+summary(contrib_therm_beta_ser$n_pair)
+
+large_ser<-foreach(grec=unique(contrib_therm_beta_ser$greco),.combine = rbind)%do%{
+  print(grec)
+  contrib_grec<-get_contrib_one_ser(contrib_therm_beta_ser[greco%in%grec,]$ser,table_flora,4,"topt_climplant")
+  
+return(contrib_grec[[1]])
+  
+  
+}
+
+summary(large_ser$Beta1)
+summary(large_ser$Gamma1)
+
+
+summary(contrib_therm_beta_ser$Beta1)
+summary(contrib_therm_beta_ser$Gamma1)
 
 #### Statistical tests #### 
 
@@ -497,6 +531,9 @@ test_signif_random("contrib_beta_warmer_ext",wilcox.test,data_sim = bootstrap_sa
 test_signif_random("contrib_beta_colder_col",wilcox.test,data_sim = bootstrap_same_n_occurrence)
 test_signif_random("contrib_beta_warmer_col",wilcox.test,data_sim = bootstrap_same_n_occurrence)
 
+## area
+sum(st_area(ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),]))
+sum(st_area(ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),])*ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),]$p_forest   )
 
 ## linear models to asses the relationship between MAT and the components
 # of delta beta
@@ -509,25 +546,91 @@ test_signif<-lm(topt_ext~mean_tmoy,data=contrib_therm_beta_ser)
 test_signif<-lm(topt_col~mean_tmoy,data=contrib_therm_beta_ser)
 test_signif<-lm(sp_thermo~mean_tmoy,data=contrib_therm_beta_ser)
 
-contrib_therm_beta_ser[,reference_level:=0]
-melt_thermo<-melt(contrib_therm_beta_ser,measure.var = c("reference_level","sp_thermo","topt_ext","topt_col"))
-melt_beta<-melt(contrib_therm_beta_ser,measure.var = c("reference_level","sp_delta_beta","beta_ext","beta_col"))
-melt_beta<-melt(contrib_therm_beta_ser,measure.var = c("sp_delta_beta","beta_ext","beta_col"))
-
-
-test_signif<-lm(value~mean_tmoy*variable,data=melt_thermo)
-test_signif<-lm(value~mean_tmoy*variable,data=melt_beta)
-plot(test_signif)
-plot(melt_beta$mean_tmoy,melt_beta$value)
 summary(test_signif)
 
-sjPlot::plot_model(test_signif,type="pred",terms=c("mean_tmoy","variable"))
 
 
-ggplot(contrib_therm_beta_ser_8,aes(x=mean_tmoy,y=contrib_beta_colder_ext_Heterogenize))+geom_point()+geom_smooth(method="lm")+theme_bw()
+test_signif<-lm(topt_ext~mean_tmoy+st_coordinates(coord_ser)[,1]+st_coordinates(coord_ser)[,2],data=contrib_therm_beta_ser)
+test_signif<-lm(beta_col~mean_tmoy+st_coordinates(coord_ser)[,1]+st_coordinates(coord_ser)[,2],data=contrib_therm_beta_ser)
 
-contrib_therm_beta_ser_8<-merge(contrib_therm_beta_ser_8,ser_variable_summary,by="ser")
 
+#### spatial autocorrelation
+
+ggplot(contrib_therm_beta_ser,aes(x=mean_tmoy,y=residuals(test_signif)))+geom_point()+geom_smooth()
+
+ggplot(contrib_therm_beta_ser,aes(x=st_coordinates(coord_ser)[,2],y=residuals(test_signif)))+geom_point()+geom_smooth()
+
+
+ggplot(ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),],aes(fill=  residuals(test_signif)))+
+  geom_sf()+
+  scale_fill_gradient2()+
+  theme_bw()
+
+
+ggplot(ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),],aes(fill= inc.lag))+
+  geom_sf()+
+  scale_fill_gradient2(midpoint = 0,low="cadetblue",high="tomato")+
+  theme_bw()
+
+library(spdep)
+
+nb <- poly2nb(ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),], queen=TRUE)
+lw <- nb2listw(nb, style="W", zero.policy=TRUE)
+
+
+lnb_beta<-foreach(nb=as.list(lw$neighbours),.combine = rbind)%do%{
+  print(contrib_therm_beta_ser[nb,]$ser)
+  contrib_grec<-get_contrib_one_ser(contrib_therm_beta_ser[nb,]$ser,table_flora,4,"topt_climplant")
+  
+  return(contrib_grec[[1]])
+  
+  
+}
+
+summary(large_ser$Beta1/large_ser$sp_tot_past)
+summary(large_ser$Gamma1)
+
+
+summary(contrib_therm_beta_ser$Beta1/large_ser$sp_tot_past)
+summary(contrib_therm_beta_ser$Gamma1)
+
+
+
+
+ moran(ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),]$topt_ext, lw, length(nb), Szero(lw))[1]
+
+inc.lag <- lag.listw(lw, ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),]$topt_ext)
+
+inc.lag
+
+
+moran.test(ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),]$topt_ext,lw, alternative="greater")
+
+
+moran.test(residuals(test_signif),lw, alternative="greater")
+
+
+
+test_signif<-lm(beta_ext~mean_tmoy,data=contrib_therm_beta_ser)
+moran.test(residuals(test_signif),lw, alternative="greater")
+test_signif<-lm(beta_col~mean_tmoy,data=contrib_therm_beta_ser)
+moran.test(residuals(test_signif),lw, alternative="greater")
+test_signif<-lm(sp_delta_beta~mean_tmoy,data=contrib_therm_beta_ser)
+moran.test(residuals(test_signif),lw, alternative="greater")
+test_signif<-lm(topt_ext~mean_tmoy,data=contrib_therm_beta_ser)
+moran.test(residuals(test_signif),lw, alternative="greater")
+test_signif<-lm(topt_col~mean_tmoy,data=contrib_therm_beta_ser)
+moran.test(residuals(test_signif),lw, alternative="greater")
+test_signif<-lm(sp_thermo~mean_tmoy,data=contrib_therm_beta_ser)
+moran.test(residuals(test_signif),lw, alternative="greater")
+
+inc.lag <- lag.listw(lw, ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),]$topt_ext)
+test_signif<-lm(topt_ext~mean_tmoy+inc.lag,data=contrib_therm_beta_ser)
+summary(test_signif)
+
+inc.lag <- lag.listw(lw, ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),]$topt_ext)
+test_signif<-lm(topt_ext~mean_tmoy+inc.lag,data=contrib_therm_beta_ser)
+summary(test_signif)
 #### Creation of tables for the extended and supplementary materials ####
 
 ## theses tables will contains the mean, standard deviation and 
@@ -670,63 +773,78 @@ ggsave(file.path("Figures_results","fig_1.svg"),arrange_hists,scale=2,width = 45
 
 #### Figure 2: histogram of occurrences####
 
-##initial data formating for the histogram
-list_sp_contrib[,topt_class:=cut(topt_climplant,1:16)]
-x_scale<-seq(1,16,1)
-dt_occ_hist<-list_sp_contrib[,.(occ_past=sum(occurrence_past),occ_recent=sum(occurrence_recent)),by=.(topt_class)]
-dt_occ_hist<-dt_occ_hist[order(topt_class),]
-dt_occ_hist[,x:=x_scale[c(1,2,3,4,5,6,7,8,9,10,11,12,13,15)]]
-dt_occ_hist<-rbind(dt_occ_hist,data.table(topt_class=NA,occ_past=0,occ_recent=0,x=14))
+### review 1
+
+list_sp_contrib[sp_relative_occ=="col",weighted.mean(topt_climplant,abs(delta_occ))]
+list_sp_contrib[sp_relative_occ=="ext",weighted.mean(topt_climplant,abs(delta_occ))]
+
+summed_sp_occ<-list_sp_contrib[,.(delta_occ=sum(delta_occ),
+                                  past_occ=sum(occurrence_past),
+                                  recent_occ=sum(occurrence_recent),
+                                  occ=sum(occurrence_total),
+                                  topt_climplant=unique(topt_climplant)),by=species_name]
+summed_sp_occ<-summed_sp_occ[delta_occ!=0,]
+
+summed_sp_occ[,sp_relative_occ:=ifelse(delta_occ >0,"col","ext")]
+
+summed_sp_occ[,sum(delta_occ),by=sp_relative_occ]
+
+label_fig_2<-c(paste0("Gain in occurrences\nmean thermal opt. :",signif(summed_sp_occ[sp_relative_occ=="col",weighted.mean(topt_climplant,abs(delta_occ))],3) ,"°C"),
+               paste0("Decline in occurrences\nmean thermal opt. :",signif(summed_sp_occ[sp_relative_occ=="ext",weighted.mean(topt_climplant,abs(delta_occ))],3) ,"°C" ))
 
 
-export_histogram<-ggplot(list_sp_contrib,aes(x=topt_climplant),alpha=0.5)+
-  geom_histogram(aes(weight=occurrence_past,fill="past"),color="grey60",alpha=0.5,breaks=x_scale)+ # the aes() weight argument allows to create the count of species ourselves
-  geom_histogram(aes(weight=occurrence_recent*(1/1),fill="recent"),color="gold4",alpha=0.5,breaks=x_scale)+
-  geom_step(data=dt_occ_hist,aes(x=x,y=occ_past),lty=2,linewidth=0.5)+
-  geom_step(data=dt_occ_hist,aes(x=x,y=occ_recent),lty=1,linewidth=0.5)+
-  #geom_vline(lty=1,color=c("salmon4","gold1"),linewidth=0.9,xintercept = c(list_sp_contrib[,weighted.mean(topt_climplant,occurrence_past)],list_sp_contrib[,weighted.mean(topt_climplant,occurrence_recent)]))+
-  theme_classic()+
-  labs(fill="Plot period",y="Species occurrences",x="Thermal optimum of a species")+
-  scale_x_continuous(breaks = seq(1,18,2),limits = c(1,18))+
-  theme(legend.position = c(0.8, 0.5),legend.background = element_rect(fill = "white", color = "grey10"))+
-  guides(fill=guide_legend(override.aes = list(lty=c(2,1),color="black",linewidth=0.5,alpha=0.5)))+
-  scale_fill_manual(breaks =c("past","recent"),
-                    values=c("salmon4","gold1","peru","indianred4"),
-                    label=c(paste0("Past period (2005-2011) \nmean Thermal opt. :",signif(list_sp_contrib[,weighted.mean(topt_climplant,occurrence_past)],3)),
-                            paste0("Recent period (2015-2021) \nmean Thermal opt. :",signif(list_sp_contrib[,weighted.mean(topt_climplant,occurrence_recent)],3),"0")))
+out_fig_2<-ggplot(summed_sp_occ[sp_relative_occ!="stable",],aes(x=topt_climplant,weight=abs(delta_occ),fill=sp_relative_occ,lty=sp_relative_occ))+
+  geom_histogram(alpha=0.5,position = "identity",breaks=seq(1,16,by=1),color="grey20")+
+  scale_fill_manual(breaks = c("col","ext"),values=c("lightcyan4","peru"),label =label_fig_2)+
+  scale_linetype_manual(breaks = c("col","ext"),values=c(2,1),label = label_fig_2)+
+  scale_x_continuous(breaks = c(2,4,6,8,10,12,14,16))+
+  #facet_wrap(~greco)+
+  labs(y="Absolute occurrence change",x="Species thermal optimum",fill="Dynamic",linetype="Dynamic")+
+  theme_bw(base_size = 12)+
+  theme(legend.background = element_blank(),legend.position = c(0.8,0.65),legend.spacing.y = unit(0.2, 'cm'))  +
+  ## important additional element
+  guides(fill = guide_legend(byrow = TRUE))
+
 
 showtext:: showtext_auto(enable = F)
-ggsave(file.path("Figures_results","fig_hist_main.png"),export_histogram,dpi=400,scale = 1.7,width = 80,height = 60,units = "mm",)
+ggsave(file.path("Figures_results","fig_hist_main_reworked.png"),out_fig_2,dpi=400,scale = 1.8,width = 80,height = 70,units = "mm",)
 
 
+summed_sp_occ<-list_sp_contrib[,.(delta_occ=sum(delta_occ),
+                                  past_occ=sum(occurrence_past),
+                                  recent_occ=sum(occurrence_recent),
+                                  occ=sum(occurrence_total),
+                                  topt_climplant=unique(topt_climplant)),by=species_name]
 
-list_sp_contrib[,topt_class:=cut(topt_climplant,1:16)]
-dt_occ_hist<-list_sp_contrib[,.(occ_past=sum(occurrence_past),occ_recent=sum(occurrence_recent)),by=.(greco,topt_class)]
-dt_occ_hist<-dt_occ_hist[order(topt_class),]
-dt_occ_hist[,x:=as.numeric(word(str_remove(as.character(dt_occ_hist$topt_class),"[(]"),sep=","))]
-dt_occ_hist<-rbind(dt_occ_hist,data.table(greco=c("A","B","C","D","E","F","G","H","I","J"),topt_class=NA,occ_past=0,occ_recent=0,x=14))
+summed_sp_occ[,n_delta_occ:=recent_occ/occ]
 
-supplementary_histogram<-ggplot(list_sp_contrib,aes(x=topt_climplant),alpha=0.5)+
-  geom_histogram(aes(weight=occurrence_past,fill="past"),color="grey60",alpha=0.5,breaks=x_scale)+
-  geom_histogram(aes(weight=occurrence_recent*(1/1),fill="recent"),color="gold4",alpha=0.5,breaks=x_scale)+
-  geom_step(data=dt_occ_hist,aes(x=x,y=occ_past),lty=2,linewidth=0.3)+
-  geom_step(data=dt_occ_hist,aes(x=x,y=occ_recent),lty=1,linewidth=0.3)+
-  theme_classic()+
-  facet_wrap(~greco,scales="free_y")+
-  labs(fill="Plot period",y="occurrence of a species",x="Thermal optimum of a species")+
-  scale_x_continuous(breaks = seq(1,16,2))+
-  theme(legend.position = c(0.79, 0.18),
-        legend.background = element_rect(fill = "white", color = "grey10"),
-        strip.background = element_rect(fill="grey85"))+
-  guides(fill=guide_legend(override.aes = list(lty=c(2,1),color="black",linewidth=0.5,alpha=0.5)))+
-  scale_fill_manual(breaks =c("past","recent"),
-                    values=c("salmon4","gold1","peru","indianred4"),
-                    label=c(paste0("Past period (2005-2011)  "),
-                            paste0("Recent period (2015-2021)  ")))
 
-showtext:: showtext_auto(enable = F)
-ggsave(file.path("Figures_results","fig_hist_suppl.png"),supplementary_histogram,dpi=600,scale = 1.25,width = 180,height = 120,units = "mm",)
+occ_thermal_niche_plot<-ggplot(summed_sp_occ,aes(x=topt_climplant,y=(occ)))+ 
+  geom_point(size=0.9)+
+  scale_y_continuous(trans = "log",breaks = c(0,1,10,100,1000,10000))+
+  geom_smooth(method='lm')+
+  coord_cartesian(ylim = c(0.9,20000))+
+  labs(x="Species thermal optimum",y="Occurrence (log scale)")+
+  theme_bw()
 
+
+list_sp_contrib[,n_delta_occ:=occurrence_recent/occurrence_total]
+list_sp_contrib[,sptotser:=sum(occurrence_past),by=ser]
+list_sp_contrib[,rela_occ:=occurrence_past/sptotser]
+
+
+  occ_baseline_occ<-ggplot(summed_sp_occ[],aes(x=(occ),y=(n_delta_occ)))+ 
+   scale_x_continuous(trans = "log",breaks = c(0,1,10,100,1000,10000))+
+    geom_hline(lty=2,color="grey50",yintercept = 0.5)+
+    geom_smooth(method='lm',alpha=0.5)+
+    geom_point(size=0.5)+
+    labs(x="Occurrences (log scale)",y="Proportion of occurrences\n in the past period (%)")+
+    theme_bw()
+
+  
+    occ_baseline_occ
+
+ggsave(file.path("Figures_results","suppl_figure_occ.png"),ggarrange(occ_thermal_niche_plot,occ_baseline_occ,align="hv",nrow=2,labels=c("a)","b)")),dpi=300,scale = 1,width = 180,height = 180,units = "mm",)
 
 
 #### Figure 3: main partition figure ####
@@ -738,117 +856,198 @@ dt_label_color_reference<-data.table(variable=c("sp_thermo","sp_delta_beta",c("t
                                  label=c("Thermophilization","\U0394\U03B2-diversity","Extinction","Colonization","Cold-adapted species","Warm-adapted species","Cold-adapted species","Warm-adapted species",
                                          "Extinction","Colonization","Cold-adapted species","Warm-adapted species","Cold-adapted species","Warm-adapted species"))
 
-## helper function for facet label
-facet_labeller <- function(variable,value)return(dt_label_color_reference[variable==value,label])
 
-##function that create a row of the main figure (Fig.3) if given the corresonding components
-create_one_box<-function(var, # vectors of one or several components
-                         response="thermo", # thermo or beta
-                         lims=c(-0.35,0.6), # the Y axis limit
-                         dt=contrib_therm_beta_ser, # the dataset
-                         dt_sim=bootstrap_random_topt){ # the dataset of a null model for significance testing. here delta beta is not tested against a null model but 0
-  var_save<-var
-  first_var<-var[1]
-  list_plot<-list()
-  for(i in var){
-    ## from wide to long data.table
-    data<-suppressWarnings(melt(dt,id.vars="ser",verbose =F)[variable%in%i,])
-    data_simu<-suppressWarnings(melt(dt_sim,id.vars="ser",verbose =F)[variable%in%i,])
-    
-    ## mean valu of the component
-    mean_val<-round(mean(as.numeric(data$value),na.rm=T),2)
-    mean_val_simu<-ifelse(response=="beta" && length(var)!=8,0,round(mean(as.numeric(data_simu$value),na.rm=T),2))
-    
-    ## we use the wilcox.test to h0= no difference between the null model (thermo) or 0 (delta beta)
-    ## When we test the 8 delta_beta components, the value is constrained too, so we test it against a null model too instead of 0
-    p_val<-if(response=="beta" && length(var)!=8) wilcox.test(as.numeric(data$value))$p.value else wilcox.test(as.numeric(data$value), as.numeric(data_simu$value))$p.value
-    signif_star <- NA                            
-    signif_star[p_val < 0.05] <- "*"
-    signif_star[p_val < 0.01] <- "**"
-    signif_star[p_val < 0.001] <- "***"
-    signif_star[is.na(signif_star)] <- "n.s."
-    
-   
-    res<-ggplot(data,aes(x=variable,y=as.numeric(value),fill=variable))+
-      geom_hline(yintercept = mean_val_simu,lty=2)+
-      geom_jitter(shape=16,alpha=0.6,mapping=aes(color=variable),show.legend = F)+
-      geom_boxplot(alpha=0.6,outlier.shape = NA,show.legend = F,linewidth=0.3)+
-      theme_bw()+
-      ## we make the label appear only once with this command, and we display for the 8 comp figure too
-      labs(x="",y=if(length(var)%in%c(2,8)) if(response=="thermo")"Thermophilization °C/ 10years" else "\U0394\U03B2-diversity" else " ")+
-      facet_wrap(~variable,labeller = facet_labeller)+
-      coord_cartesian(ylim =lims)+
-      annotate("text", x=0.45, y=lims[2]-0.2*lims[2],hjust=0, label=paste0("µ = ",mean_val," ",signif_star),size=3.5, color = "grey15")+
-      theme(strip.text.x = element_text(size = if(length(var)==8) 8 else 10,face="bold"))
-      
-    # change the number of signif numbers in the Y axis
-    add_signif<-function(x){
-      x<-as.character(x)
-      x<-ifelse(response=="beta" & x!="0",paste0(x,".0"),x)
-      x
-    }
-    
-     res<-res+
-       scale_y_continuous(labels =add_signif)+
-       scale_discrete_manual(aesthetics = c("colour", "fill"),
-                             values=dt_label_color_reference$color,breaks=dt_label_color_reference$variable)
-    
-    # adjustement for several rows with different numbers of plot to match smoothly, and adjust the size of the boxplot
-    res<-res +theme(axis.line.x = element_blank(),axis.title.x = element_blank(),axis.ticks.x = element_blank(),axis.text.x=element_blank(),
-                    plot.margin =  margin(0,0,0,0),
-                    panel.grid.major.x=element_blank(),
-                    strip.background =element_rect(fill=if(response=="thermo")"#EAE397" else "#C5D49A"),
-                    strip.text = element_text(margin = margin(0.1,0,0.1,0, "cm")))#+scale_x_discrete(expand = expansion(0.05,0.75))
-    
-    if(i != first_var)res<-res+theme(axis.title.y =  element_blank(),axis.text.y = element_blank(),axis.ticks.y = element_blank(),axis.line.y = element_blank())
-    if(length(var)==1)res<-res+scale_x_discrete(expand = expansion(0,0.75)) # we widen the first box
-    
-    
-    list_plot[[i]]<-res+theme(plot.background = element_rect( fill = NA,colour = NA,linewidth = 1))
-  }
-  w<-if(length(var)==2) c(1.137,1)else if(length(var)==4)c(1.27,1,1,1) else if(length(var)==8)c(1.45,rep(1,7)) else 1
+color_ref_main_fig<-data.table(breaks=c("sp_thermo","sp_delta_beta","ext","col",
+                                        "contrib_colder_ext","contrib_warmer_ext","contrib_colder_col","contrib_warmer_col"),
+                               color=dt_label_color_reference$color[1:8],
+                               #label=c("Variable","Variable","Extinction","Colonization","Ext. Cold-adapted","Ext. Warm-adapted","Col. Cold-adapted","Col. Warm-adapted"))
+label=c("Total","Total","Extinction","Colonization","Extinction\n Cold-adapted","Extinction\n Warm-adapted","Colonization\n Cold-adapted","Colonization\n Warm-adapted"))
+
+thermo_var<-c("sp_thermo","topt_ext","topt_col","contrib_topt_colder_ext" ,"contrib_topt_warmer_ext"  ,"contrib_topt_colder_col"  ,"contrib_topt_warmer_col"  )
+
+
+contrib_therm_beta_ser_melt<-melt(contrib_therm_beta_ser,measure.vars=colnames(contrib_therm_beta_ser)[c(2:9,14:17,33,34)])
+contrib_therm_beta_ser_melt[,variable:=as.character(variable)]
+contrib_therm_beta_ser_melt[,type:=ifelse(grepl("beta",variable),"2_beta","1_thermo")]
+contrib_therm_beta_ser_melt[,variable_2:=str_remove_all(variable,"topt_")]
+contrib_therm_beta_ser_melt[,variable_2:=str_remove_all(variable_2,"beta_")]
+contrib_therm_beta_ser_melt[,variable_3:=ifelse(variable_2%in% c("sp_thermo","sp_delta_beta"),"Total",variable_2)]
+
+
+
+bootstrap_random_topt_melt<-melt(bootstrap_random_topt,measure.vars=colnames(contrib_therm_beta_ser)[c(2:9,14:17,33,34)])
+bootstrap_random_topt_melt[,value_random_topt:=value]
+bootstrap_random_topt_melt[variable%in%thermo_var,value_random_topt:=value_random_topt]
+
+contrib_therm_beta_ser_melt<-cbind(contrib_therm_beta_ser_melt,bootstrap_random_topt_melt[,"value_random_topt"])
+
+table_test<-contrib_therm_beta_ser_melt[,.(mean_val=mean(value),
+                                           mean_val_random=mean(value_random_topt),
+                                           p_val=ifelse(!variable%in%thermo_var,
+                                                        wilcox.test(value)$p.value,
+                                                        wilcox.test(value,(value_random_topt))$p.value )),by=variable]
+
+
+
+label_facets<-c(`1_thermo`="Thermophilization",`2_beta`="\U0394\U03B2-diversity")
+#label_facets<-c(`1_thermo`="- - - - - 0 - - - - -0 - - - - - - 0 - - - - - 0 - - - - -",`2_beta`="- - - - - 0 - - - - -0 - - - - - - 0 - - - - - 0 - - - - -")
+
+
+
+table_test[,signif_star:="n.s."]
+table_test[p_val < 0.05,"signif_star"] <- "*"
+table_test[p_val < 0.01,"signif_star"] <- "**"
+table_test[p_val < 0.001,"signif_star"] <- "***"
+
+table_test[,type:=ifelse(grepl("beta",variable),"2_beta","1_thermo")]
+table_test[,label:=paste0("µ = ",round(mean_val*ifelse(type=="1_thermo",10,1),2)," ",signif_star)]
+table_test[,variable_2:=str_remove_all(variable,"topt_")]
+table_test[,variable_2:=str_remove_all(variable_2,"beta_")]
+table_test[,variable_3:=ifelse(variable_2%in% c("sp_thermo","sp_delta_beta"),"Total",variable_2)]
+table_test[,x:=ifelse(type=="1_thermo",-0.45,1.93)]
+table_test[variable%in%c("contrib_topt_colder_col","contrib_topt_warmer_ext"),x:=0.19]
+table_test[variable%in%c("beta_col","contrib_beta_warmer_col","contrib_beta_colder_col"),x:=-2.5]
+
+contrib_therm_beta_ser_melt
+
+contrib_therm_beta_ser[,ecoregion:= ifelse(greco%in% c("J"),"Medit",ifelse(greco%in% c("D","G","E","H","I"),"Mountain","Lowland")),]
+
+
+plot_thermo<-ggplot(contrib_therm_beta_ser_melt[type=="1_thermo"],aes(x=value*10,y=variable_3,fill=variable_2))+
+  geom_jitter(shape=16,alpha=0.6,mapping=aes(color=variable_2),show.legend = F,size=1.2)+
+  geom_boxplot(alpha=0.6,outlier.shape = NA,show.legend = F,linewidth=0.3)+
+  geom_text(data=table_test[type=="1_thermo",],aes(x=x,y=variable_3,label=label),nudge_y =0.25,size=3.2,hjust=0)+
+  facet_grid(~type,scales = "free",shrink = T,labeller = as_labeller(label_facets))+
+  theme_bw()+
+  geom_vline(xintercept = 0 , lty=2)+
+  geom_hline(yintercept = c(4.5,6.5),lwd=0.5)+
+  geom_point(data=table_test[type=="1_thermo",],aes(x= mean_val_random, y= variable_3),pch=21,fill="white",color="grey20",size=3)+
+  scale_fill_manual(values = color_ref_main_fig$color,breaks = color_ref_main_fig$breaks)+
+  scale_color_manual(values = color_ref_main_fig$color,breaks = color_ref_main_fig$breaks)+
+  scale_y_discrete(limits=c("Total",color_ref_main_fig$breaks[-c(1,2)])[7:1] ,label= color_ref_main_fig$label[8:2] )+
+  theme(strip.text.x = element_text(size = 10,face="bold"),plot.margin = margin(r=0,l=4),panel.border = element_rect(linewidth=0.5),strip.background =element_rect(fill="#EAE397",linewidth = 0.5))+
+  labs(x="Thermophilization °C/ 10years",y="Contributions to the variable")
   
-  return(ggarrange(plotlist=list_plot,ncol=length(var),align = "h",widths = w))# we arrange the several plots created into one row
   
-}
-
-thermo_lims<-c(-0.35,0.6)/10
-beta_lims<-c(-3,4)
-
-
-
-main_plot<-ggarrange(labels=c("a)","","","b)","",""),
-  create_one_box(dt=contrib_therm_beta_ser,response = "thermo",lims = thermo_lims,c("sp_thermo")),
-  create_one_box(dt=contrib_therm_beta_ser,response = "thermo",lims = thermo_lims,c("topt_ext","topt_col"))+theme_void(),
-  create_one_box(dt=contrib_therm_beta_ser,response = "thermo",lims = thermo_lims,c("contrib_topt_colder_ext","contrib_topt_warmer_ext" ,"contrib_topt_colder_col" ,"contrib_topt_warmer_col")),
-  create_one_box(dt=contrib_therm_beta_ser,response = "beta",lims = beta_lims,c("contrib_beta_colder_ext","contrib_beta_warmer_ext" ,"contrib_beta_colder_col" ,"contrib_beta_warmer_col")),
-  create_one_box(dt=contrib_therm_beta_ser,response = "beta",lims = beta_lims,c("beta_ext","beta_col")),
-  create_one_box(dt=contrib_therm_beta_ser,response = "beta",lims = beta_lims,c("sp_delta_beta")),
-  nrow=6,label.x = c(-0.01,0,0,-0.01,0,0),align = "hv"
-)+theme(plot.margin = margin(1,1,1,1,unit = "mm"))
-
-main_plot
+plot_beta<-ggplot(contrib_therm_beta_ser_melt[type=="2_beta"],aes(x=value,y=variable_3,fill=variable_2))+
+  geom_jitter(shape=16,alpha=0.6,mapping=aes(color=variable_2),show.legend = F,size=1.2)+
+  geom_boxplot(alpha=0.6,outlier.shape = NA,show.legend = F,linewidth=0.3)+
+  geom_text(data=table_test[type=="2_beta",],aes(x=x,y=variable_3,label=label),nudge_y =0.25,size=3.2,hjust=0)+
+  facet_grid(~type,scales = "free",shrink = T,labeller = as_labeller(label_facets))+
+  theme_bw()+
+  geom_vline(xintercept = 0 , lty=2)+
+  geom_hline(yintercept = c(4.5,6.5),lwd=0.5)+
+  coord_cartesian(xlim=c(-3,4))+
+  scale_fill_manual(values = color_ref_main_fig$color,breaks = color_ref_main_fig$breaks)+
+  scale_color_manual(values = color_ref_main_fig$color,breaks = color_ref_main_fig$breaks)+
+  scale_y_discrete(limits=c("Total",color_ref_main_fig$breaks[-c(1,2)])[7:1] ,label= rep("",7) )+
+  theme(strip.text.x = element_text(size = 10,face="bold"),axis.ticks = element_blank(),panel.border = element_rect(linewidth=0.5),strip.background =element_rect(fill="#C5D49A",linewidth = 0.5))+
+  labs(x="\U0394\U03B2-diversity",y=" ")
 
 
-suppl_plot_same_occ<-ggarrange(labels=c("a)","","","b)","",""),
-  create_one_box(dt=bootstrap_same_n_occurrence,response = "thermo",lims = thermo_lims,c("sp_thermo")),
-  create_one_box(dt=bootstrap_same_n_occurrence,response = "thermo",lims = thermo_lims,c("topt_ext","topt_col"))+theme_void(),
-  create_one_box(dt=bootstrap_same_n_occurrence,response = "thermo",lims = thermo_lims,c("contrib_topt_colder_ext","contrib_topt_warmer_ext" ,"contrib_topt_colder_col" ,"contrib_topt_warmer_col")),
-  create_one_box(dt=bootstrap_same_n_occurrence,response = "beta",lims = beta_lims,c("contrib_beta_colder_ext","contrib_beta_warmer_ext" ,"contrib_beta_colder_col" ,"contrib_beta_warmer_col")),
-  create_one_box(dt=bootstrap_same_n_occurrence,response = "beta",lims = beta_lims,c("beta_ext","beta_col")),
-  create_one_box(dt=bootstrap_same_n_occurrence,response = "beta",lims = beta_lims,c("sp_delta_beta")),
-  nrow=6,label.x = c(-0.01,0,0,-0.01,0,0)
-)+theme(plot.margin = margin(1,1,1,1,unit = "mm"))
+out_main_fig<-ggarrange(plotlist = list(plot_thermo,plot_beta+theme(plot.background = element_rect(fill=NA,color=NA))),labels = c("a)","b)"),align = "h",widths = c(1.25,1))
 
 
 
 showtext:: showtext_auto(enable = TRUE)
-ggsave(file.path("Figures_results","main_figure.pdf"),main_plot,width =180,height =145,units = "mm")
-ggsave(file.path("Figures_results","suppl_main_figure.pdf"),suppl_plot_same_occ,width =180,height =145,units = "mm")
+ggsave(file.path("Figures_results","main_figure_reworked.pdf"),out_main_fig,width =180,height =120,units = "mm",scale=0.95)
 showtext:: showtext_auto(enable = FALSE) 
-ggsave(file.path("Figures_results","main_figure.jpg"),main_plot,width =180,height =145,units = "mm",dpi=450)
-ggsave(file.path("Figures_results","suppl_main_figure.jpg"),suppl_plot_same_occ,width =180,height =145,units = "mm",dpi=450)
+ggsave(file.path("Figures_results","main_figure_reworked.jpg"),out_main_fig,width =180,height =120,units = "mm",scale=0.95,dpi=450)
 showtext:: showtext_auto(enable = TRUE)
+
+
+### extended figure of the random topt boot strap
+
+bootstrap_random_topt_full<-readRDS(file.path("Saved_computation","bootstrap_random_topt_full.RData"))
+
+label_hist<-c("Thermophilization","Extinction","Colonization","Ext. Cold-adapted","Ext. Warm-adapted","Col. Cold-adapted","Col. Warm-adapted")
+
+names(label_hist)<-dt_label_color_reference$variable[c(1,3:8)]
+
+vertical_mean<-contrib_therm_beta_ser_melt[variable%in% thermo_var,.(true_mean=mean(value*10)),by=variable]
+
+bootstrap_random_topt_full_melt<-melt(bootstrap_random_topt_full,measure.vars=colnames(contrib_therm_beta_ser)[c(2:9,14:17,33,34)])
+
+extended_fig_random_topt<-ggplot(bootstrap_random_topt_full_melt[variable%in% thermo_var,],aes(x=value*10,fill=variable))+
+  theme_bw()+
+  geom_histogram(breaks=seq(-1,1,0.025),color="grey40",mapping=aes(weight=1),alpha=0.5,show.legend = F)+
+  geom_vline(xintercept=0,lty=2,color="grey60")+
+  geom_vline(mapping = aes(xintercept=true_mean,color="Mean observed value"),vertical_mean)+
+  facet_wrap(~factor(variable, levels=thermo_var[c(2,4,5,3,6,7,1)]),labeller = as_labeller(label_hist),ncol=3,dir = "v")+
+  scale_fill_manual(values = dt_label_color_reference$color,breaks = dt_label_color_reference$variable)+
+  scale_color_manual(values="darkred")+
+  theme(legend.position = c(0.8,0.55))+
+  coord_cartesian(xlim=c(-0.5,0.5))+
+  labs(y="Simulated ecoregion count",x="Thermophilization °C/ 10years",colour="")
+
+extended_fig_random_topt
+
+showtext:: showtext_auto(enable = FALSE)
+ggsave(file.path("Figures_results","Extended_figure_random_topt.jpg"),extended_fig_random_topt,width =180,height =120,units = "mm",scale=1,dpi=400)
+ggsave(file.path("Figures_results","Extended_figure_random_topt.pdf"),extended_fig_random_topt,width =180,height =120,units = "mm",scale=1)
+
+
+## extended figure ecoregions 
+
+contrib_therm_beta_ser_melt_ecoreg<-contrib_therm_beta_ser_melt[variable %in%c("sp_thermo","sp_delta_beta","beta_ext","beta_col","topt_ext","topt_col"),]
+
+contrib_therm_beta_ser_melt_ecoreg[,ecoregion:=as.factor(ecoregion)]
+levels(contrib_therm_beta_ser_melt_ecoreg$ecoregion)<-c("3_Lowland","1_Medit","2_mountain")
+contrib_therm_beta_ser_melt_ecoreg<-contrib_therm_beta_ser_melt_ecoreg[order(ecoregion),]
+
+
+label_ecoreg<-data.table(value=0.04,variable_3=c("Total","Total","Total"),variable_2=c("Total","Total","Total"),ecoregion= c("3_Lowland","1_Medit","2_mountain"),label=c("Lowland","Mediterranean","Mountain"))
+
+
+
+plot_thermo<-ggplot(contrib_therm_beta_ser_melt_ecoreg[type=="1_thermo"],
+                    aes(x=value*10,y=variable_3,fill=variable_2,group=paste0(ecoregion,variable_2)))+
+  #geom_text(data=label_ecoreg,aes(label=label),position=position_jitterdodge(jitter.width = 0.1),size=2)+
+  annotate("text",y=c(3.33,2.93,3.13),x=0.39,label=c("Lowland","Mediterranean","Mountain"),size=2.5)+
+  geom_point(position=position_jitterdodge(jitter.width = 0.1),mapping=aes(color=variable_2),shape=16,alpha=0.6,show.legend = F,size=1.2)+
+  geom_boxplot(alpha=0.6,outlier.shape = NA,show.legend = F,linewidth=0.3)+
+  #geom_text(data=table_test[type=="1_thermo",],aes(x=x,y=variable_3,label=label),nudge_y =0.25,size=3.2,hjust=0)+
+  facet_grid(~type,scales = "free",shrink = T,labeller = as_labeller(label_facets))+
+  theme_bw()+
+  geom_vline(xintercept = 0 , lty=2)+
+  geom_hline(yintercept = c(2.5),lwd=0.5)+
+  
+  #geom_point(data=table_test[type=="1_thermo",],aes(x= mean_val_random, y= variable_3),pch=21,fill="white",color="grey20",size=3)+
+  scale_fill_manual(values = color_ref_main_fig$color,breaks = color_ref_main_fig$breaks)+
+  scale_color_manual(values = color_ref_main_fig$color,breaks = color_ref_main_fig$breaks)+
+  scale_y_discrete(limits=c("Total",color_ref_main_fig$breaks[-c(1,2)])[3:1] ,label= color_ref_main_fig$label[4:2] )+
+  theme(strip.text.x = element_text(size = 10,face="bold"),plot.margin = margin(r=0,l=4),panel.border = element_rect(linewidth=0.5),strip.background =element_rect(fill="#EAE397",linewidth = 0.5))+
+  labs(x="Thermophilization °C/ 10years",y="Contributions to the variable")
+
+
+plot_beta<-ggplot(contrib_therm_beta_ser_melt_ecoreg[type=="2_beta"],
+                  aes(x=value,y=variable_3,fill=variable_2,group=paste0(ecoregion,variable_2)))+
+  geom_point(position=position_jitterdodge(jitter.width = 0.1),mapping=aes(color=variable_2),shape=16,alpha=0.6,show.legend = F,size=1.2)+
+  geom_boxplot(alpha=0.6,outlier.shape = NA,show.legend = F,linewidth=0.3)+
+ # geom_text(data=table_test[type=="2_beta",],aes(x=x,y=variable_3,label=label),nudge_y =0.25,size=3.2,hjust=0)+
+  facet_grid(~type,scales = "free",shrink = T,labeller = as_labeller(label_facets))+
+  theme_bw()+
+  geom_vline(xintercept = 0 , lty=2)+
+  geom_hline(yintercept = c(2.5),lwd=0.5)+
+  coord_cartesian(xlim=c(-3,4))+
+  scale_fill_manual(values = color_ref_main_fig$color,breaks = color_ref_main_fig$breaks)+
+  scale_color_manual(values = color_ref_main_fig$color,breaks = color_ref_main_fig$breaks)+
+  scale_y_discrete(limits=c("Total",color_ref_main_fig$breaks[-c(1,2)])[3:1] ,label= rep("",3) )+
+  theme(strip.text.x = element_text(size = 10,face="bold"),axis.ticks = element_blank(),panel.border = element_rect(linewidth=0.5),strip.background =element_rect(fill="#C5D49A",linewidth = 0.5))+
+  labs(x="\U0394\U03B2-diversity",y=" ")
+
+
+
+out_ext_fig_ecoreg<-ggarrange(plotlist = list(plot_thermo,plot_beta+theme(plot.background = element_rect(fill=NA,color=NA))),labels = c("a)","b)"),align = "h",widths = c(1.25,1))
+
+
+
+# showtext:: showtext_auto(enable = TRUE)
+# ggsave(file.path("Figures_results","main_figure_reworked.pdf"),out_ext_fig_ecoreg,width =180,height =120,units = "mm",scale=0.95)
+showtext:: showtext_auto(enable = FALSE) 
+ggsave(file.path("Figures_results","extended_ecoreg_figure.jpg"),out_ext_fig_ecoreg,width =180,height =100,units = "mm",scale=0.95,dpi=450)
+showtext:: showtext_auto(enable = TRUE)
+
 
 #### Figure 4: Relationship with MAT and maps ####
 
@@ -875,9 +1074,9 @@ make_inset_map<-function(var,lims_col){
 ins_beta<-make_inset_map("sp_delta_beta",2.5)
 ins_beta_col<-make_inset_map("beta_col",2.5)
 ins_beta_ext<-make_inset_map("beta_ext",2.5)
-ins_thermo<-make_inset_map("sp_thermo",0.2)
-ins_thermo_col<-make_inset_map("topt_col",0.2)
-ins_thermo_ext<-make_inset_map("topt_ext",0.2)
+ins_thermo<-make_inset_map("sp_thermo",0.02)
+ins_thermo_col<-make_inset_map("topt_col",0.02)
+ins_thermo_ext<-make_inset_map("topt_ext",0.02)
 
 
 label<-dt_label_color_reference$label
@@ -892,6 +1091,7 @@ make_main_plot<-function(var=c("sp_delta_beta","beta_ext","beta_col"),lims_y=c(-
   
   ## reordering the facets of facet_wrap()
   if("sp_thermo"%in% var)data_melt[,variable:=factor(variable,levels=c("sp_thermo","topt_ext","topt_col"))]
+  if("sp_thermo"%in% var)data_melt[,value:=value*10]
   if("sp_delta_beta"%in% var)data_melt[,variable:=factor(variable,levels=c("sp_delta_beta","beta_ext","beta_col"))]
   
   ## this lm allows to plot a response curve
@@ -969,13 +1169,23 @@ rm(ins_beta,ins_beta_col,ins_beta_ext,ins_thermo,ins_thermo_col,ins_thermo_ext,e
 
 ## we append new labels to the data_table that references color and labels
 
-name_8_comp_beta<-colnames(contrib_therm_beta_ser_8)[(ncol(contrib_therm_beta_ser_8)-11):(ncol(contrib_therm_beta_ser_8)-4) ]
-name_8_comp_topt<-colnames(contrib_therm_beta_ser_8)[(ncol(contrib_therm_beta_ser_8)-19):(ncol(contrib_therm_beta_ser_8)-12) ]
+name_8_comp_common<-c(grep("common",colnames(contrib_therm_beta_ser_8),value=T))
+name_8_comp_rare<-c(grep("rare",colnames(contrib_therm_beta_ser_8),value=T))
 
-labs_8<-c("Rare cold\nspecies","Common cold\nspecies","Common cold\nspecies","Rare cold\nspecies",
-          "Rare warm\nspecies","Common warm\nspecies","Common warm\nspecies","Rare warm\nspecies")
+name_8_comp_topt<-c(grep("topt",name_8_comp_common,value=T),grep("topt",name_8_comp_rare,value=T))
+name_8_comp_beta<-c(grep("beta",name_8_comp_common,value=T),grep("beta",name_8_comp_rare,value=T))
+
+name_8_comp_topt<-name_8_comp_topt[c(5,1,2,6,3,7,4,8)]
+name_8_comp_beta<-name_8_comp_beta[c(5,1,2,6,3,7,4,8)]
+
+
+labs_8<-c("Col. rare\ncold-adapted","Col. common\ncold-adapted","Ext. common\ncold-adapted","Ext. rare\ncold-adapted",
+          "Col. common\nwarm-adapted","Col. rare\nwarm-adapted","Ext. common\nwarm-adapted","Ext. rare\nwarm-adapted")
+
+
 dt_color_8<-data.table(variable=name_8_comp_beta,
-                       color=c("cadetblue","cadetblue","lightcyan4","lightcyan4","tomato","tomato","indianred3","indianred3"),
+                       color=c("cadetblue","cadetblue","lightcyan4","lightcyan4",
+                                          "tomato","tomato","indianred3","indianred3"),
                        label=labs_8)
 
 dt_color_8_topt<-data.table(variable=name_8_comp_topt,
@@ -985,22 +1195,94 @@ dt_color_8_topt<-data.table(variable=name_8_comp_topt,
 dt_label_color_reference<-rbind(dt_label_color_reference,dt_color_8)
 dt_label_color_reference<-rbind(dt_label_color_reference,dt_color_8_topt)
 
-## We use the function used for the Main figure here to create 8 boxplots
-Extended_figure_thermo<-create_one_box(dt=contrib_therm_beta_ser_8,
-                                       dt_sim=bootstrap_random_topt,
-                                       response = "thermo",lims = c(-0.35,0.60),var=name_8_comp_topt[c(3,4,7,8,2,1,6,5)])# reordering the label to match figure 3
-
-Extended_figure_beta<-create_one_box(dt=contrib_therm_beta_ser_8,
-                                     dt_sim=bootstrap_random_topt,
-                                     response = "beta",lims = c(-4,3.8),var=name_8_comp_beta[c(3,4,7,8,2,1,6,5)])
 
 
-Extended_figure_export<-ggarrange(Extended_figure_thermo,Extended_figure_beta,nrow=2,labels = c("a)","b)"),align = "v")+theme(plot.background = element_rect(fill="white",color = NA),plot.margin=margin(3,3,3,3))
+contrib_therm_beta_ser_8$sp_thermo<-contrib_therm_beta_ser_8$sp_thermo*10
+contrib_therm_beta_ser_melt_8<-melt(contrib_therm_beta_ser_8,measure.vars=c("sp_thermo",name_8_comp_topt,"sp_delta_beta",name_8_comp_beta))
+contrib_therm_beta_ser_melt_8[,variable:=as.character(variable)]
+contrib_therm_beta_ser_melt_8[,type:=ifelse(grepl("beta",variable),"2_beta","1_thermo")]
 
-library(svglite) # needed to export svg
 
-ggsave(file.path("Figures_results","Figure_8_comp.png"),Extended_figure_export,units ="mm",width = 180,height =90,scale=1.25)
-ggsave(file.path("Figures_results","Figure_8_comp.svg"),Extended_figure_export,units ="mm",width = 180,height =90,scale=1.25)
+bootstrap_random_topt_melt_8<-melt(bootstrap_random_topt,measure.vars=c("sp_thermo",name_8_comp_topt,"sp_delta_beta",name_8_comp_beta))
+bootstrap_random_topt_melt_8[,value_random_topt:=value]
+#bootstrap_random_topt_melt_8[variable%in%thermo_var,value_random_topt:=value_random_topt/10]
+
+contrib_therm_beta_ser_melt_8<-cbind(contrib_therm_beta_ser_melt_8,bootstrap_random_topt_melt_8[,"value_random_topt"])
+
+table_test_8<-contrib_therm_beta_ser_melt_8[,.(mean_val=mean(value),
+                                           mean_val_random=mean(value_random_topt),
+                                           p_val=ifelse(FALSE,
+                                                        wilcox.test(value)$p.value,
+                                                        wilcox.test(value,(value_random_topt))$p.value )),by=variable]
+
+
+table_test_8[,signif_star:="n.s."]
+table_test_8[p_val < 0.05,"signif_star"] <- "*"
+table_test_8[p_val < 0.01,"signif_star"] <- "**"
+table_test_8[p_val < 0.001,"signif_star"] <- "***"
+
+table_test_8[,type:=ifelse(grepl("beta",variable),"2_beta","1_thermo")]
+table_test_8[,label:=paste0("µ = ",round(mean_val*ifelse(type=="1_thermo",1,1),2)," ",signif_star)]
+table_test_8[,x:=ifelse(type=="1_thermo",-0.25,-3.8)]
+table_test_8[variable%in%c("contrib_topt_colder_col_rare","contrib_topt_colder_col_common","contrib_topt_warmer_ext_rare","contrib_topt_warmer_ext_common"),x:=0.13]
+table_test_8[variable%in%c("contrib_beta_colder_ext_rare","contrib_beta_warmer_ext_rare","contrib_beta_warmer_col_common","contrib_beta_colder_col_common"),x:=1.1]
+
+
+label_facets<-c(`1_thermo`="Thermophilization",`2_beta`="\U0394\U03B2-diversity")
+#label_facets<-c(`1_thermo`="- - - - - 0 - - - - -0 - - - - - - 0 - - - - - 0 - - - - -",`2_beta`="- - - - - 0 - - - - -0 - - - - - - 0 - - - - - 0 - - - - -")
+
+contrib_therm_beta_ser_melt_8[,value:=as.numeric(value)]
+
+
+plot_thermo<-ggplot(contrib_therm_beta_ser_melt_8[type=="1_thermo"],aes(x=value,y=variable,fill=variable))+
+  geom_jitter(shape=16,alpha=0.6,mapping=aes(color=variable),show.legend = F,size=1.2)+
+  geom_boxplot(alpha=0.6,outlier.shape = NA,show.legend = F,linewidth=0.3)+
+  geom_text(data=table_test_8[type=="1_thermo",],aes(x=x,y=variable,label=label),nudge_y =0.25,size=3.2,hjust=0)+
+  facet_grid(~type,scales = "free",shrink = T,labeller = as_labeller(label_facets))+
+  theme_bw()+
+  geom_vline(xintercept = 0 , lty=2)+
+  geom_hline(yintercept = c(8.5),lwd=0.5)+
+  geom_hline(yintercept = c(4.5),lwd=0.5,color="grey70",lty=2)+
+  coord_cartesian(xlim=c(-0.375,0.5))+
+  geom_point(data=table_test_8[type=="1_thermo",],aes(x= mean_val_random, y= variable),pch=21,fill="white",color="grey20",size=3)+
+  scale_fill_manual(values = dt_label_color_reference$color,breaks = dt_label_color_reference$variable)+
+  scale_color_manual(values = dt_label_color_reference$color,breaks = dt_label_color_reference$variable)+
+  scale_y_discrete(limits=dt_label_color_reference[variable%in%c("sp_thermo",name_8_comp_topt),]$variable[c(1,4,5,8,9,3,2,6,7)][order(-(1:9))], 
+                   label= c("Total",dt_label_color_reference[variable%in%c(name_8_comp_topt),]$label) [c(1,4,5,8,9,3,2,6,7)][order(-(1:9))] )+
+  theme(strip.text.x = element_text(size = 10,face="bold"),plot.margin = margin(r=0,l=4),panel.border = element_rect(linewidth=0.5),strip.background =element_rect(fill="#EAE397",linewidth = 0.5))+
+  labs(x="Thermophilization °C/ 10years",y="Contributions to the variable")
+
+
+plot_beta<-ggplot(contrib_therm_beta_ser_melt_8[type=="2_beta"],aes(x=value,y=variable,fill=variable))+
+  geom_jitter(shape=16,alpha=0.6,mapping=aes(color=variable),show.legend = F,size=1.2)+
+  geom_boxplot(alpha=0.6,outlier.shape = NA,show.legend = F,linewidth=0.3)+
+  geom_text(data=table_test_8[type=="2_beta",],aes(x=x,y=variable,label=label),nudge_y =0.25,size=3.2,hjust=0)+
+  facet_grid(~type,scales = "free",shrink = T,labeller = as_labeller(label_facets))+
+  theme_bw()+
+  geom_vline(xintercept = 0 , lty=2)+
+  geom_hline(yintercept = c(8.5),lwd=0.5)+
+  geom_hline(yintercept = c(4.5),lwd=0.5,color="grey70",lty=2)+
+  coord_cartesian(xlim=c(-4,4))+
+  geom_point(data=table_test_8[type=="2_beta",],aes(x= mean_val_random, y= variable),pch=21,fill="white",color="grey20",size=3)+
+  scale_fill_manual(values = dt_label_color_reference$color,breaks = dt_label_color_reference$variable)+
+  scale_color_manual(values = dt_label_color_reference$color,breaks = dt_label_color_reference$variable)+
+  scale_y_discrete(limits=dt_label_color_reference[variable%in%c("sp_delta_beta",name_8_comp_beta),]$variable[c(1,4,5,8,9,3,2,6,7)][order(-(1:9))], 
+                  label= rep("",9) )+
+  theme(strip.text.x = element_text(size = 10,face="bold"),axis.ticks = element_blank(),panel.border = element_rect(linewidth=0.5),strip.background =element_rect(fill="#C5D49A",linewidth = 0.5))+
+  labs(x="\U0394\U03B2-diversity",y=" ")
+
+
+
+
+out_extended_fig<-ggarrange(plotlist = list(plot_thermo,plot_beta+theme(plot.background = element_rect(fill=NA,color=NA))),labels = c("a)","b)"),align = "h",widths = c(1.25,1))
+
+
+
+showtext:: showtext_auto(enable = TRUE)
+ggsave(file.path("Figures_results","Extended_figure_reworked.pdf"),out_extended_fig,width =180,height =140,units = "mm",scale=0.95)
+showtext:: showtext_auto(enable = FALSE) 
+ggsave(file.path("Figures_results","Extended_figure_reworked.jpg"),out_extended_fig,width =180,height =140,units = "mm",scale=0.95,dpi=450)
+showtext:: showtext_auto(enable = TRUE)
 
 
 #### Extended figures: map of the sampling ####
@@ -1031,7 +1313,7 @@ map_all_ser_france<-ggplot(ser_value_sf)+
   guides(fill=guide_legend(nrow=2,order=c(2)))+
  
   labs(pattern="Ecoregion type")+
-  scale_fill_manual(values=colorRampPalette(c("ivory","peachpuff3","olivedrab"))(7),na.value = "grey65",label=c("<50","51:100","101:200","201:300","301:400",">400","Excluded"),name="Number of plot pair")
+  scale_fill_manual(values=colorRampPalette(c("ivory","peachpuff3","olivedrab"))(7),na.value = "grey65",label=c("15:50","51:100","101:200","201:300","301:400",">400","Excluded"),name="Number of plot pair")
 
 
 
