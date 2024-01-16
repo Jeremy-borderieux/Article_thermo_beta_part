@@ -273,28 +273,47 @@ ggplot(list_sp_contrib[],aes(x=occurrence_recent,y=ifelse(sp_relative_occ=="col"
 
 
 list_sp_contrib_small_melt<-melt.data.table(list_sp_contrib,measure.vars = c("occurrence_past" , "occurrence_recent"))
+list_sp_contrib_small_melt<-melt.data.table(list_sp_contrib[!species_name%in%order_sp_contrib$species_name[1:6],],measure.vars = c("occurrence_past" , "occurrence_recent"))
+list_sp_contrib_small_melt[,greco_name:=switchv(EXPR=greco, 
+                                               A="North West",
+                                               B="Center North",
+                                               C="Grand East",
+                                               D="Vosges",
+                                               E="Jura",
+                                               `F`="South West",
+                                               G="Central massif",
+                                               H="Alpes",
+                                               I="Pyrenees",
+                                               J="Mediterranean"
+                                               )]
+
+list_sp_contrib_small_melt[,variable_name:=ifelse(variable=="occurrence_past","Past period (2005-2011)","Recent period (2015-2021)")]
 
 
-ggplot(list_sp_contrib[greco=="J"],aes(x=topt_climplant))+
-  geom_histogram(position="origin",mapping=aes(weight=occurrence_past,color="Past"))+
-  geom_histogram(position="origin",mapping=aes(weight=occurrence_recent*0.5,color="Recent"))+
-  theme_bw()
-
-ggplot(list_sp_contrib_small_melt[greco=="J"],aes(x=topt_climplant,y=..scaled..,weight=value,fill=variable))+
-  geom_density(alpha=0.5,position = "identity",color="grey50",adjust=1.25)+
-  theme_bw()
-
-ggplot(list_sp_contrib_small_melt,aes(x=topt_climplant,y=..scaled..,weight=value,fill=variable))+
-  geom_density(alpha=0.5,position = "identity",color="grey50",adjust=1.25)+
+histo_greco<-ggplot(list_sp_contrib_small_melt,aes(x=topt_climplant,y=..scaled..,weight=value,fill=variable_name))+
+  geom_density(alpha=0.5,position = "identity",color="grey35",adjust=1.25)+
+  scale_fill_manual(values=c("grey","gold3"))+
   theme_bw()+
-  facet_wrap(~greco)
+  labs(x="Species thermal optimum °C",y="Relative species occurrences",fill="Temporality")+
+  theme(legend.position = c(0.75,0.15))+
+  facet_wrap(~greco_name,scales = "free_x")
 
+
+ggsave("histo_greco.png",histo_greco,width=180,unit="mm",height = 130,dpi=400)
 
 ggplot(list_sp_contrib_small_melt[greco=="J"],aes(x=topt_climplant,y=..scaled..,weight=value,fill=variable))+
   geom_density(alpha=0.5,position = "identity",color="grey50",adjust=0.75)+
   theme_bw()+
   facet_wrap(~ser)
 
+ggplot(list_sp_contrib[greco=="J"],aes(x=topt_climplant))+
+  geom_histogram(position="dodge",mapping=aes(weight=occurrence_past,fill="Past"),alpha=0.5,boundary = 0)+
+  geom_histogram(position="dodge",mapping=aes(weight=occurrence_recent*0.5,fill="Recent"),alpha=0.5,boundary = 0)+
+  theme_bw()
+
+ggplot(list_sp_contrib_small_melt[greco=="J"],aes(x=topt_climplant,y=..scaled..,weight=value,fill=variable))+
+  geom_density(alpha=0.5,position = "identity",color="grey50",adjust=1.25)+
+  theme_bw()
 
 contrib_therm_beta_ser[,sum(n_plot),by=ser]
 
@@ -342,4 +361,86 @@ list_sp_contrib[occurrence_total==3 & sp_relative_occ!="stable",table(common_rar
 
 
 list_sp_contrib[occurrence_past==5 & sp_relative_occ!="stable",table(common_rare)]
+
+
+
+#### spatial autocor ####
+
+#### spatial autocorrelation
+
+ggplot(contrib_therm_beta_ser,aes(x=mean_tmoy,y=residuals(test_signif)))+geom_point()+geom_smooth()
+
+ggplot(contrib_therm_beta_ser,aes(x=st_coordinates(coord_ser)[,2],y=residuals(test_signif)))+geom_point()+geom_smooth()
+
+
+ggplot(ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),],aes(fill=  residuals(test_signif)))+
+  geom_sf()+
+  scale_fill_gradient2()+
+  theme_bw()
+
+
+ggplot(ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),],aes(fill= inc.lag))+
+  geom_sf()+
+  scale_fill_gradient2(midpoint = 0,low="cadetblue",high="tomato")+
+  theme_bw()
+
+library(spdep)
+
+nb <- poly2nb(ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),], queen=TRUE)
+lw <- nb2listw(nb, style="W", zero.policy=TRUE)
+
+
+lnb_beta<-foreach(nb=as.list(lw$neighbours),.combine = rbind)%do%{
+  print(contrib_therm_beta_ser[nb,]$ser)
+  contrib_grec<-get_contrib_one_ser(contrib_therm_beta_ser[nb,]$ser,table_flora,4,"topt_climplant")
+  
+  return(contrib_grec[[1]])
+  
+  
+}
+
+summary(large_ser$Beta1/large_ser$sp_tot_past)
+summary(large_ser$Gamma1)
+
+
+summary(contrib_therm_beta_ser$Beta1/large_ser$sp_tot_past)
+summary(contrib_therm_beta_ser$Gamma1)
+
+
+
+
+moran(ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),]$topt_ext, lw, length(nb), Szero(lw))[1]
+
+inc.lag <- lag.listw(lw, ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),]$topt_ext)
+
+inc.lag
+
+
+moran.test(ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),]$topt_ext,lw, alternative="greater")
+
+
+moran.test(residuals(test_signif),lw, alternative="greater")
+
+
+
+test_signif<-lm(beta_ext~mean_tmoy,data=contrib_therm_beta_ser)
+moran.test(residuals(test_signif),lw, alternative="greater")
+test_signif<-lm(beta_col~mean_tmoy,data=contrib_therm_beta_ser)
+moran.test(residuals(test_signif),lw, alternative="greater")
+test_signif<-lm(sp_delta_beta~mean_tmoy,data=contrib_therm_beta_ser)
+moran.test(residuals(test_signif),lw, alternative="greater")
+test_signif<-lm(topt_ext~mean_tmoy,data=contrib_therm_beta_ser)
+moran.test(residuals(test_signif),lw, alternative="greater")
+test_signif<-lm(topt_col~mean_tmoy,data=contrib_therm_beta_ser)
+moran.test(residuals(test_signif),lw, alternative="greater")
+test_signif<-lm(sp_thermo~mean_tmoy,data=contrib_therm_beta_ser)
+moran.test(residuals(test_signif),lw, alternative="greater")
+
+inc.lag <- lag.listw(lw, ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),]$topt_ext)
+test_signif<-lm(topt_ext~mean_tmoy+inc.lag,data=contrib_therm_beta_ser)
+summary(test_signif)
+
+inc.lag <- lag.listw(lw, ser_value_sf_no_corsica[!is.na(ser_value_sf_no_corsica$sp_thermo),]$topt_ext)
+test_signif<-lm(topt_ext~mean_tmoy+inc.lag,data=contrib_therm_beta_ser)
+summary(test_signif)
 

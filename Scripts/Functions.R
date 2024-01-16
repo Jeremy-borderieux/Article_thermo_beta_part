@@ -308,6 +308,7 @@ get_contrib_one_ser<-function(ser_select, # character, if of an ecoregion
                                    topt_name="topt_climplant", # name of the thermal optimum to use topt_climplant, topt, topt_picq
                                    random_topt=F, # should the thermal optima of the species randomize (useful for bootstrap)
                                    rarefy=F,# should the time period with the most occurrences be rarefied ? (useful for bootstrap)
+                                   rarefy_rare_sp=F,
                                    year=NULL){ # do a seperate analysis for each year of the "recent" plot
 
   #### 1/data processing
@@ -359,19 +360,11 @@ get_contrib_one_ser<-function(ser_select, # character, if of an ecoregion
   
   
   #### error_topt==T
-  if(random_topt=="error"){
-    if(topt_name!="topt_climplant") stop("only with ClimPlant")
-   # melt_climplant_full_tmp<-melt_climplant_full[species_name%in%comparison_surv_one_ser$species_name,]
-    melt_climplant_full_tmp<-melt_climplant_full[,.(topt_climplant=sample(topt_climplant,1)),by=species_name]
-    comparison_surv_one_ser[,topt_climplant:=NULL]
-    comparison_surv_one_ser<-merge(comparison_surv_one_ser,melt_climplant_full_tmp,by="species_name")
-   
-    
-    
-  }
-  
+ 
   #### 2/Thermophilization partitioning
   
+  
+
   
   ## we count the number of occurrences recorded in the two period
   sp_tot_past<-sum(comparison_surv_one_ser$occurrence_past)
@@ -401,6 +394,67 @@ get_contrib_one_ser<-function(ser_select, # character, if of an ecoregion
   comparison_surv_one_ser[,relative_topt:=get(topt_name)-ser_it_sp_past]
   comparison_surv_one_ser[,raw_contrib:=(relative_topt*(delta_occ))/(sp_tot_recent)] # computation of species level contribution to thermophilization
   
+  if(rarefy_rare_sp){
+    comparison_surv_one_ser[,sp_relative_beta:=ifelse((occurrence_past)<= ((N_plot/2)*0.1) , "rare","common")]
+    comparison_surv_one_ser[,categ_4:=paste0(sp_relative_topt,"_",sp_relative_beta)]
+    
+    table_to_rarefy<-comparison_surv_one_ser[,.N,by=categ_4][order(categ_4)]
+    
+    if(diff(table_to_rarefy[c(1,3),N])>=0){  ## if >0 they are more warmer common
+     tmp_common<-  rbind(comparison_surv_one_ser[categ_4=="colder_common"] ,comparison_surv_one_ser[categ_4=="warmer_common"][sample(.N,table_to_rarefy[1,N])])
+      
+    }else{
+      
+      tmp_common<- rbind(comparison_surv_one_ser[categ_4=="warmer_common"] , comparison_surv_one_ser[categ_4=="colder_common"][sample(.N,table_to_rarefy[3,N])])
+      
+    }
+    
+    
+    if(diff(table_to_rarefy[c(2,4),N])>=0){  ## if >0 they are more warmer common
+      tmp_rare<-  rbind(comparison_surv_one_ser[categ_4=="colder_rare"] ,comparison_surv_one_ser[categ_4=="warmer_rare"][sample(.N,table_to_rarefy[2,N])])
+      
+    }else{
+      
+      tmp_rare<- rbind(comparison_surv_one_ser[categ_4=="warmer_rare"] , comparison_surv_one_ser[categ_4=="colder_rare"][sample(.N,table_to_rarefy[4,N])])
+      
+    }
+    
+    
+    comparison_surv_one_ser<-rbind(tmp_common,tmp_rare)
+    
+    ## we count the number of occurrences recorded in the two period
+    sp_tot_past<-sum(comparison_surv_one_ser$occurrence_past)
+    sp_tot_recent<-sum(comparison_surv_one_ser$occurrence_recent)
+    
+    ## we can compute the ratio of occurrences between the two period  
+    normalized_sp_tot<-sp_tot_recent / sp_tot_past
+    
+    ## get the mean Topt of the occurrences of the past and the recent. (average a the ecoregion  scale)
+    ser_it_sp_past<-comparison_surv_one_ser[,weighted.mean(get(topt_name),occurrence_past,na.rm=T)]
+    ser_it_sp_recent<-comparison_surv_one_ser[,weighted.mean(get(topt_name),occurrence_recent,na.rm=T)]
+    ## we can then compute the thermophlization °C/year
+    warming<-ser_it_sp_recent - ser_it_sp_past
+    warming<-warming
+    
+    
+    ## we assign the two classes used for the partitioning 
+    ## sp_relative_topt : the species has a higher or lower thermal optimum than the mean topt (ecoregion scale)
+    ## sp_relative_occ : is the species occurrences of the species declining/ increasing ?
+    comparison_surv_one_ser[,sp_relative_topt:=ifelse(get(topt_name)<ser_it_sp_past,"colder","warmer")]
+    comparison_surv_one_ser[,sp_relative_occ:=ifelse(ratio_2==0.5,"stable",ifelse(ratio_2<0.5,"ext","col"))] 
+    
+    ## to compute delta topt (thermophilization), relative thermal optimum of the species to the mean of the ecoregion is useful
+    comparison_surv_one_ser[,relative_topt:=get(topt_name)-ser_it_sp_past]
+    comparison_surv_one_ser[,raw_contrib:=(relative_topt*(delta_occ))/(sp_tot_recent)] # computation of species level contribution to thermophilization
+    
+    
+    
+    
+    
+  }
+  
+  
+  
   ##comparison_surv_one_ser is ready to to compute the component of thermophilization
   
   
@@ -412,6 +466,16 @@ get_contrib_one_ser<-function(ser_select, # character, if of an ecoregion
   ecopart_two_sp_ser<-ecopart.multi.JB(table_past,table_recent,part="two")
   # sp components : each species get an ext and colo component of contribution to delta_beta
   ecopart_multi_sp_ser<-ecopart.multi.JB(table_past,table_recent,part="sp")
+  
+  if(rarefy_rare_sp){
+    ecopart_multi_sp_ser<-ecopart.multi.JB(table_past[,comparison_surv_one_ser$species_name],
+                                           table_recent[,comparison_surv_one_ser$species_name],
+                                           part="sp")
+    
+    
+    
+  }
+  
   
   ecopart_four_ser<-ecopart.multi.JB(table_past,table_recent,part="four")
   
@@ -447,6 +511,8 @@ get_contrib_one_ser<-function(ser_select, # character, if of an ecoregion
     
     comparison_surv_one_ser_beta[,sp_relative_beta:=ifelse((occurrence_past+occurrence_recent)<= (5) , "rare","common")]
     comparison_surv_one_ser_beta[,sp_relative_beta:=ifelse((occurrence_past)<= ((N_plot/2)*0.1) , "rare","common")]
+    
+    
     
     
     bet_test<-comparison_surv_one_ser_beta[,.(N_past=sum(occurrence_past),N=sum(occurrence_recent),raw_contrib=sum(raw_contrib,na.rm=T),beta=sum(delta_beta)),by=.(sp_relative_occ,sp_relative_topt,sp_relative_beta)][order(sp_relative_topt,sp_relative_occ,sp_relative_beta)]#[sp_relative_beta!="stable"]
@@ -526,11 +592,11 @@ get_contrib_one_ser<-function(ser_select, # character, if of an ecoregion
 ## where thermal optima are randomized or occurrences are rarefied
 ## if average = T return a data.table of one line corresponding to the average of the simulation for that ecoregion
 ## same argument as get_contrib_one_ser()
-run_contrib_multiple_time<-function(n,ser_select,table_flora,n_comp=4,topt_name="topt_climplant",random_topt=F,rarefy=F,average=T){
+run_contrib_multiple_time<-function(n,ser_select,table_flora,n_comp=4,topt_name="topt_climplant",random_topt=F,rarefy=F,average=T,rarefy_rare_sp = F){
   # the analysis is done n times
   res_boot_one_ser<-foreach(i=1:n,.combine = rbind,.multicombine = T)%do%{
     set.seed(i) # a seed is set for reproducibility
-    res<-get_contrib_one_ser(ser_select,table_flora,n_comp,topt_name,random_topt = random_topt,rarefy=rarefy)[[1]]
+    res<-get_contrib_one_ser(ser_select,table_flora,n_comp,topt_name,random_topt = random_topt,rarefy=rarefy,rarefy_rare_sp=rarefy_rare_sp)[[1]]
     return(res)
   }
   
