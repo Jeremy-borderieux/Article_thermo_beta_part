@@ -618,8 +618,15 @@ create_dt_result<-function(dt_partition_result,var_name=T){
                     sd=signif(sd(value),2),
                     p_value_num=signif(wilcox.test(value)$p.value,3)),by=variable]
   
+  
   sub_dt[,p_value:=as.character(p_value_num)]
-  sub_dt[,p_value:=ifelse(p_value_num<0.0001,"<0.001",p_value)]
+  #sub_dt[,p_value:=ifelse(p_value_num<0.0001,"<0.001",p_value)]
+  #sub_dt[,p_value:=ifelse(p_value_num<0.000001,"<10-6",p_value)]
+  
+  sub_dt[,p_value:=str_replace_all(p_value,"e","*10")]
+  
+  sub_dt[,p_value:=p_value_num]
+  
   sub_dt[,p_value_num:=NULL]
   
   if(var_name==F)sub_dt[,variable:=NULL]
@@ -637,7 +644,7 @@ result_to_export_simulation<-cbind(create_dt_result(bootstrap_same_n_occurrence)
 result_to_export_different_topt<-cbind(create_dt_result(contrib_therm_beta_ser_ecoplant_picq),create_dt_result(contrib_therm_beta_ser_ecoplant,F))
 
 
-write.table(result_to_export,file=file.path("Figures_results","sup_tab_results.csv"),sep=";",dec=",",row.names = F)
+write.table(result_to_export,file=file.path("Figures_results","sup_tab_results.csv"),sep=";",dec=",",row.names = F,fileEncoding = "UTF-8")
 write.table(result_to_export_simulation,file=file.path("Figures_results","sup_tab_simulations.csv"),sep=";",dec=",",row.names = F)
 write.table(result_to_export_different_topt,file=file.path("Figures_results","sup_tab_other_topt.csv"),sep=";",dec=",",row.names = F)
 
@@ -1061,6 +1068,9 @@ extended_fig_random_topt
 showtext:: showtext_auto(enable = FALSE)
 ggsave(file.path("Figures_results","Extended_figure_random_topt.jpg"),extended_fig_random_topt,width =180,height =120,units = "mm",scale=1,dpi=400)
 ggsave(file.path("Figures_results","Extended_figure_random_topt.pdf"),extended_fig_random_topt,width =180,height =120,units = "mm",scale=1)
+showtext:: showtext_auto(enable = FALSE)
+ggsave(file.path("Figures_results","Extended_figure_random_topt.eps"),device = "eps",out_extended_fig,width =180,height =120,units = "mm",scale=1)
+showtext:: showtext_auto(enable = TRUE) 
 
 
 ## extended figure ecoregions 
@@ -1122,7 +1132,8 @@ out_ext_fig_ecoreg<-ggarrange(plotlist = list(plot_thermo,plot_beta+theme(plot.b
 # ggsave(file.path("Figures_results","main_figure_reworked.pdf"),out_ext_fig_ecoreg,width =180,height =120,units = "mm",scale=0.95)
 showtext:: showtext_auto(enable = FALSE) 
 ggsave(file.path("Figures_results","extended_ecoreg_figure.jpg"),out_ext_fig_ecoreg,width =180,height =100,units = "mm",scale=0.95,dpi=450)
-showtext:: showtext_auto(enable = TRUE)
+ggsave(file.path("Figures_results","extended_ecoreg_figure.eps"),device = "eps",out_extended_fig,width =180,height =100,units = "mm",scale=0.95)
+showtext:: showtext_auto(enable = TRUE) 
 
 
 #### Figure 4: Relationship with MAT and maps ####
@@ -1359,7 +1370,9 @@ ggsave(file.path("Figures_results","Extended_figure_reworked.pdf"),out_extended_
 showtext:: showtext_auto(enable = FALSE) 
 ggsave(file.path("Figures_results","Extended_figure_reworked.jpg"),out_extended_fig,width =180,height =140,units = "mm",scale=0.95,dpi=450)
 showtext:: showtext_auto(enable = TRUE)
-
+showtext:: showtext_auto(enable = FALSE)
+ggsave(file.path("Figures_results","Extended_figure_reworked.eps"),device = "eps",out_extended_fig,width =180,height =140,units = "mm",scale=0.95)
+showtext:: showtext_auto(enable = TRUE) 
 
 #### Extended figures: map of the sampling ####
 
@@ -1384,10 +1397,11 @@ map_all_ser_france<-ggplot(ser_value_sf)+
   geom_sf(aes(fill=(cut_n_duet)),color="grey60",show.legend = T)+
   geom_sf(data=large_ecoregion_sf,fill=NA,color="grey25",linewidth=0.5)+
   geom_sf(data=ser_of_interes_sf,linewidth=0.5,color="darkred",fill=NA)+
+
+  
   theme_bw()+
   theme(legend.position = "bottom",legend.direction = "vertical")+
   guides(fill=guide_legend(nrow=2,order=c(2)))+
- 
   labs(pattern="Ecoregion type")+
   scale_fill_manual(values=colorRampPalette(c("ivory","peachpuff3","olivedrab"))(7),na.value = "grey65",label=c("15:50","51:100","101:200","201:300","301:400",">400","Excluded"),name="Number of plot pairs")
 
