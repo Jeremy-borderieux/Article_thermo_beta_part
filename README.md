@@ -2,7 +2,7 @@
 
 ## Title
 
-This repo contains the raw dataset and the code used in the study "Extinction drives recent thermophilization but does not trigger homogenization in forest understory " published in *Journal*
+This repo contains the raw dataset and the code used in the study "Extinction drives recent thermophilization but does not trigger homogenization in forest understory " published in *Nature Ecology & Evolution*
 
 **DOI:** no attribution yet
 
@@ -17,8 +17,9 @@ The analysis was run using R `4.1.1`, and we checked for reproducibility with R 
 
 ### Abstract:
 
-The ongoing climate change is triggering plant community thermophilization. Such selection process towards warm-adapted species may also lead to biotic homogenization. The link between those two processes and the community dynamic driving them (colonization and extinction) remain unknow but are critical to understand community response under rapid environmental change.
-We used 12,764 pairs of plots to study plant community change in 16 years of rising temperatures in 80 forest ecoregions of France. We computed thermophilization and Δβ-diversity (homogenization) for each ecoregion, and partitioned these changes into extinction and colonization dynamics for cold and warm-adapted species. 
-Forest understory communities thermophilized on average by 0.12 °C decade<sup>-1</sup> and up to 0.20 °C decade<sup>-1</sup> in warm ecoregions. This rate was entirely driven by extinction dynamics. Extinction of cold-adapted species was a driver of homogenization, but it was compensated by the colonization of rare species and the extinction of common species. This results in a lack of apparent trend of homogenization. 
-An extinction-driven thermophilization is concerning as it reflects the dieback of current species rather than adaptation of understory to climate change. These results suggest that a future loss of biodiversity and a delayed biotic homogenization should be considered.
+The ongoing climate change is triggering plant community thermophilization. This selection process is ought to shift community composition toward species adapted to warmer climates but may also lead to biotic homogenization. The link between thermophilization and homogenization, and the community dynamics that drive them (colonization and extinction) remain unknow, but is critical for understanding community responses under rapid environmental change.
+We used 14,167 pairs of plots to study shifts in plant community during 10 years of rising temperature, in 80 forest ecoregions of France. We computed community mean thermal optimum (thermophilization) and Δβ-diversity (homogenization) for each ecoregion and partitioned these changes into extinction and colonization dynamics of cold- and warm-adapted species. 
+Forest understory communities thermophilized on average by 0.12 °C decade-1 and up to 0.20 °C decade-1 in warm ecoregions. This rate was entirely driven by extinction dynamics. Extinction of cold-adapted species was a driver of homogenization, but it was compensated for by the colonization of rare species and the extinction of common species, resulting in the absence of an apparent homogenization trend. 
+Here we show a dieback of present cold-adapted species rather that an adaptation of communities via the arrivals of warm-adapted species, with mutually cancelling effect on β-diversity. These results suggest that a future loss of biodiversity and delayed biotic homogenization should be considered.
+
 
