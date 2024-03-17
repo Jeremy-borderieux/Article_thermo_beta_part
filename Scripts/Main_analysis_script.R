@@ -1039,6 +1039,14 @@ ggsave(file.path("Figures_results","main_figure_reworked.jpg"),out_main_fig,widt
 showtext:: showtext_auto(enable = TRUE)
 
 
+showtext:: showtext_auto(enable = TRUE)
+ggsave(file.path("Figures_results","main_figure_reworked_briefing.pdf"),out_main_fig,width =115,height =85,units = "mm",scale=1.35)
+showtext:: showtext_auto(enable = FALSE) 
+ggsave(file.path("Figures_results","main_figure_reworked_briefing.jpg"),out_main_fig,width =115,height =85,units = "mm",scale=1.35,dpi=450)
+showtext:: showtext_auto(enable = TRUE)
+
+
+
 ### extended figure of the random topt boot strap
 
 bootstrap_random_topt_full<-readRDS(file.path("Saved_computation","bootstrap_random_topt_full.RData"))
@@ -1066,10 +1074,10 @@ extended_fig_random_topt<-ggplot(bootstrap_random_topt_full_melt[variable%in% th
 extended_fig_random_topt
 
 showtext:: showtext_auto(enable = FALSE)
-ggsave(file.path("Figures_results","Extended_figure_random_topt.jpg"),extended_fig_random_topt,width =180,height =120,units = "mm",scale=1,dpi=400)
+ggsave(file.path("Figures_results","Extended_figure_random_topt.jpg"),extended_fig_random_topt+theme(plot.background = element_rect(fill="white",color=NA)),width =180,height =120,units = "mm",scale=1,dpi=400)
 ggsave(file.path("Figures_results","Extended_figure_random_topt.pdf"),extended_fig_random_topt,width =180,height =120,units = "mm",scale=1)
 showtext:: showtext_auto(enable = FALSE)
-ggsave(file.path("Figures_results","Extended_figure_random_topt.eps"),device = "eps",out_extended_fig,width =180,height =120,units = "mm",scale=1)
+ggsave(file.path("Figures_results","Extended_figure_random_topt.eps"),device = cairo_ps,extended_fig_random_topt,width =180,height =120,units = "mm",scale=1)
 showtext:: showtext_auto(enable = TRUE) 
 
 
@@ -1131,8 +1139,8 @@ out_ext_fig_ecoreg<-ggarrange(plotlist = list(plot_thermo,plot_beta+theme(plot.b
 # showtext:: showtext_auto(enable = TRUE)
 # ggsave(file.path("Figures_results","main_figure_reworked.pdf"),out_ext_fig_ecoreg,width =180,height =120,units = "mm",scale=0.95)
 showtext:: showtext_auto(enable = FALSE) 
-ggsave(file.path("Figures_results","extended_ecoreg_figure.jpg"),out_ext_fig_ecoreg,width =180,height =100,units = "mm",scale=0.95,dpi=450)
-ggsave(file.path("Figures_results","extended_ecoreg_figure.eps"),device = "eps",out_extended_fig,width =180,height =100,units = "mm",scale=0.95)
+ggsave(file.path("Figures_results","extended_ecoreg_figure.jpg"),out_ext_fig_ecoreg+theme(plot.background = element_rect(fill="white",color=NA)),width =180,height =100,units = "mm",scale=0.95,dpi=450)
+ggsave(file.path("Figures_results","extended_ecoreg_figure.eps"),device = cairo_ps,out_ext_fig_ecoreg,width =180,height =100,units = "mm",scale=0.95)
 showtext:: showtext_auto(enable = TRUE) 
 
 
@@ -1368,10 +1376,10 @@ out_extended_fig<-ggarrange(plotlist = list(plot_thermo,plot_beta+theme(plot.bac
 showtext:: showtext_auto(enable = TRUE)
 ggsave(file.path("Figures_results","Extended_figure_reworked.pdf"),out_extended_fig,width =180,height =140,units = "mm",scale=0.95)
 showtext:: showtext_auto(enable = FALSE) 
-ggsave(file.path("Figures_results","Extended_figure_reworked.jpg"),out_extended_fig,width =180,height =140,units = "mm",scale=0.95,dpi=450)
+ggsave(file.path("Figures_results","Extended_figure_reworked.jpg"),out_extended_fig+theme(plot.background = element_rect(fill="white",color=NA)),width =180,height =140,units = "mm",scale=0.95,dpi=450)
 showtext:: showtext_auto(enable = TRUE)
 showtext:: showtext_auto(enable = FALSE)
-ggsave(file.path("Figures_results","Extended_figure_reworked.eps"),device = "eps",out_extended_fig,width =180,height =140,units = "mm",scale=0.95)
+ggsave(file.path("Figures_results","Extended_figure_reworked.eps"),device = cairo_ps,out_extended_fig,width =180,height =140,units = "mm",scale=0.95)
 showtext:: showtext_auto(enable = TRUE) 
 
 #### Extended figures: map of the sampling ####
@@ -1441,4 +1449,51 @@ ggsave(file.path("Figures_results","export_map_ext_fig_1.pdf"),dpi=400,export_ma
 rm(map_all_ser_france,one_ser_plots,export_map_fig_1)
 
 
+#### Appendice: list of species####
+list_sum<-list_sp_contrib[,.(past=sum(occurrence_past),recent=sum(occurrence_recent),topt=unique(topt_climplant)),by=species_name]
+list_sum<-list_sum[order(species_name)]
+
+list_sum[,topt:=round(topt,2)]
+
+write.table(list_sum,file.path("Supplementary_lists","list_of_species.csv"),row.names = F,sep=";",dec=",")
+
+
+table_past1<-table_flora[rownames(table_flora)%in%NFI_plot_info[period=="past",as.character(idp)],]
+table_recent1<-table_flora[rownames(table_flora)%in%NFI_plot_info[period=="recent",as.character(idp)],]
+
+comparison_surv_all_sp<-create_comparaison_table(table_past1,table_recent1,ser=unique(contrib_therm_beta_ser$ser))
+comparison_surv_all_sp<-comparison_surv_all_sp[order(species_name),]
+comparison_surv_all_sp<-comparison_surv_all_sp[,.(past=sum(occurrence_past),recent=sum(occurrence_recent),topt=unique(topt_climplant)),by=species_name]
+comparison_surv_all_sp[,topt:=round(topt,2)]
+write.table(comparison_surv_all_sp,file.path("Supplementary_lists","list_of_species_full.csv"),row.names = F,sep=";",dec=",")
+
+
+export_contrib<-contrib_therm_beta_ser
+export_contrib<-export_contrib[,c("sp_topt_past","sp_topt_recent","topt_ext","topt_col",
+                                  "sp_thermo","Beta1","Beta2","beta_ext","beta_col","sp_delta_beta",
+                                  "Alpha1","Alpha2","Gamma1","Gamma2","n_plot")]
+
+export_contrib[,sp_thermo:=sp_thermo*10]
+export_contrib[,topt_ext:=topt_ext*10]
+export_contrib[,topt_col:=topt_col*10]
+
+export_contrib<-cbind(contrib_therm_beta_ser[,c("ser","NomSER")],round(export_contrib,3))
+
+
+write.table(export_contrib,file.path("Supplementary_lists","Ecoregion_change.csv"),row.names = F,sep=";",dec=",")
+
+export_contrib<-contrib_therm_beta_ser
+export_contrib<-export_contrib[,c("sp_topt_past","sp_topt_recent","topt_ext","topt_col",
+                                  "Beta1","Beta2",
+                                  "Alpha1","Alpha2","Gamma1","Gamma2","n_plot")]
+
+
+export_contrib[,topt_ext:=topt_ext*10]
+export_contrib[,topt_col:=topt_col*10]
+
+export_contrib<-cbind(contrib_therm_beta_ser[,c("ser")],round(export_contrib,2))
+
+
+
+write.table(export_contrib,file.path("Supplementary_lists","Ecoregion_change_small.csv"),row.names = F,sep=";",dec=",")
 
