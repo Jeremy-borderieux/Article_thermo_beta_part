@@ -1465,7 +1465,15 @@ comparison_surv_all_sp<-create_comparaison_table(table_past1,table_recent1,ser=u
 comparison_surv_all_sp<-comparison_surv_all_sp[order(species_name),]
 comparison_surv_all_sp<-comparison_surv_all_sp[,.(past=sum(occurrence_past),recent=sum(occurrence_recent),topt=unique(topt_climplant)),by=species_name]
 comparison_surv_all_sp[,topt:=round(topt,2)]
+
 write.table(comparison_surv_all_sp,file.path("Supplementary_lists","list_of_species_full.csv"),row.names = F,sep=";",dec=",")
+
+comparison_surv_all_sp[,N:=past+recent]
+comparison_surv_all_sp<-comparison_surv_all_sp[!is.na(topt) | N>=10,]
+comparison_surv_all_sp[,N:=NULL]
+
+write.table(comparison_surv_all_sp,file.path("Supplementary_lists","list_of_species_full_filtered.csv"),row.names = F,sep=";",dec=",")
+
 
 
 export_contrib<-contrib_therm_beta_ser
