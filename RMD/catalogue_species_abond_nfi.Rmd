@@ -1,0 +1,118 @@
+---
+title: "Catalogue changement abondance espèces"
+author: "Jeremy Borderieux"
+date: "08/12/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r oui, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Informations disponibles
+
+**Cette première version du catalogue donne pour 756 espèces les informations suivantes:**
+
+**période** passées (2005-2011) récentes (2015-2021), données IFN
+Arbres et certain arbustes exclus
+
+**N_past et N_recent** Nombre d'occurence dans les données passées et récentes (14167 placettes passées et 14167 placettes récentes)
+
+**N** Nombre d'observations totales
+
+**Contrib_thermo** Contribution de l'espèce brute à la thermophilisation. Plus la valeure absolue est grande, plus l'espece contribue a la thermophilisation (valeure positive) ou la ralentie (valeure négative)
+
+**warm or cold** Pourcentage de sylvoecorégion où l'espèce est considérée comme adaptée au climat chaud (par rapport à la moyenne des optima thermiques des autres espèces de la sylvoecorégion)
+
+**Topt ClimPlant** La temperature optimale de l'espèce selon ClimPlant
+
+
+
+**Cartes:** Evolution de la fréquence de la présence d'une espèces dans les points de la sylvoecorégion, en pourcentage (0.2 = 20%)
+
+**Critères de selection des espèces:** au moins 15 occurences dans les données passées (2005-2011) et récentes (2015-2021)
+
+
+
+
+```{r setup, echo=FALSE,warning=FALSE,message = FALSE}
+
+
+# you can now load the packages
+library(data.table) # faster and different data.frames
+library(broman) # all sort of utility functions
+library(stringr)# string manipulation
+library(ggplot2)# plotting and data representation
+library(ggspatial)
+library(sf)# handling spatial vectors
+library(foreach) # for loop for parallel computation and aggregates the outputs
+library(doParallel) # Parallel computation, with window
+library(raster)
+library(car)
+library(scales)
+library(showtext)
+library(ggpubr) # create composite ggplots
+library(cowplot)# create composite ggplots 
+library(lubridate) # easier date - time manipulation
+
+
+
+
+setwd("C:/Users/borderieux/OneDrive - agroparistech.fr/Docs/Article_thermo_beta_part")
+needed_data<-readRDS("RMD/abond_data.RData")
+
+SER_gis<-needed_data[[1]]
+france_bound<-needed_data[[2]]
+list_sp_ser_therm<-needed_data[[3]]
+occ_sp_therm<-needed_data[[4]]
+
+
+plot_map_sp_change<-function(sp_name,what="n_delta_occ"){
+  ser_sp_sf<-merge(SER_gis,list_sp_ser_therm[species_name==sp_name,],by="ser",all.x=T)
+  ser_sp_sf<-ser_sp_sf[!ser_sp_sf$ser%in%c("K11", "K12" ,"K13"),]
+  
+  topt_climplant<-round(unique(ser_sp_sf[!is.na(ser_sp_sf$topt_climplant),]$topt_climplant ),2)
+  n_tot<-sum(ser_sp_sf$occurrence_total,na.rm=T)
+  subtitle<-paste0('Topt = ',topt_climplant,"  Ntot = ",n_tot)
+  
+  # if(what=="n_delta_occ") ser_sp_sf$n_delta_occ <-with(ser_sp_sf,ifelse(delta_occ_n>0.2,0.2,ifelse(n_delta_occ< (-0.2),-0.2,n_delta_occ )))
+  # 
+  limits<- c(0,1)
+  
+  ggplot(ser_sp_sf)+geom_sf(aes(fill=get(what)),color=NA,size=0.5)+
+    scale_fill_gradient2(low = "orange",mid="white",high="chartreuse4",midpoint=0.5,limits=limits,na.value="grey")+
+    theme_grey()+
+    labs(title=sp_name,subtitle = subtitle)+labs(fill="Change in frequency")+
+    theme_bw()+
+    theme(axis.title=element_blank(), axis.text=element_blank(),axis.ticks=element_blank())
+  #rep(max(abs(st_drop_geometry(ser_sp_sf[,what])),na.rm=T),2)*c(-1,1)
+  
+  
+}
+
+occ_sp_therm$topt_climplant<-round(occ_sp_therm$topt_climplant,2)
+occ_sp_therm$contrib_thermo<-round(occ_sp_therm$contrib_thermo,1)
+occ_sp_therm$warm_or_cold<-round(occ_sp_therm$warm_or_cold,2)
+
+
+knitr::kable(occ_sp_therm)
+
+```
+
+
+```{r plot, echo=FALSE,warning=FALSE,out.height= "45%",fig.align = "left",dev="png"}
+
+
+
+
+selected_sp<-occ_sp_therm$species_name
+
+for(i in selected_sp[1:100] )print(plot_map_sp_change(i))
+
+
+
+```
+
+
