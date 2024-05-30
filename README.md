@@ -14,7 +14,9 @@ This repo contains the raw dataset and the code used in the study "Extinction dr
 
 You can clone this R project to reproduce the Analysis, the results and the figures, we advise you to use R studio and its Git connection.
 
-tutorial to getting stated with R studio and git :https://jennybc.github.io/2014-05-12-ubc/ubc-r/session03_git.html
+To rerun the analysis, launch the project thanks to the .rproj file and run the `Main_analysis_script.r` in the `script` folder.
+
+Tutorial to getting stated with R studio and git :https://jennybc.github.io/2014-05-12-ubc/ubc-r/session03_git.html
 
 The dataset contains all of the French Forest Inventory (new version: 2005-2021), which is freely distributed  by the institute for geographic and forest information (IGN) at https://inventaire-forestier.ign.fr/
 
