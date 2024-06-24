@@ -1,5 +1,7 @@
 ## Extinction drives recent thermophilization but does not trigger homogenization in forest understorey
 
+[![DOI](https://zenodo.org/badge/617944704.svg)](https://zenodo.org/doi/10.5281/zenodo.12517770)
+
 ### Abstract:
 
 The ongoing climate change is triggering plant community thermophilization. This selection process ought to shift community composition towards species adapted to warmer climates but may also lead to biotic homogenization. The link between thermophilization and homogenization and the community dynamics that drive them (colonization and extinction) remain unknown but is critical for understanding community responses under rapid environmental change. 
